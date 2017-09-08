@@ -1,0 +1,81 @@
+version: '0.1.{build}'
+image: Visual Studio 2017
+
+configuration:
+- Debug
+- Release
+platform: Any CPU
+
+init:
+ - ps: $Env:LABEL = "CI" +$Env:APPVEYOR_BUILD_NUMBER.PadLeft(5, "0")
+
+environment:
+  PATH: $(PATH);$(PROGRAMFILES)\dotnet\
+
+dotnet_csproj:
+  patch: true
+  file: '**\*.csproj'
+  version: '{version}'
+  package_version: '{version}'
+
+test_script:
+  - appveyor-retry dotnet restore -v Minimal
+  - dotnet test -c %CONFIGURATION% .\test\ManagedTasksTests\
+artifacts:
+  - path: artifacts\*.nupkg
+deploy:
+ - provider: NuGet
+   server: https://www.nuget.org/api/v2/package
+   api_key:
+     secure: D2Fu0l/iyBVmVqt/yUztGOFPy3FhYdt9DdnYTgr5KvYYSvb+mRstFwoLeEpmZTUN
+   skip_symbols: false
+   symbol_server: https://www.nuget.org/api/v2/package
+   on: 
+    branch: 
+     - test
+     - release
+
+for:
+
+# The release branch publishes without the version suffix, making an official release.
+-
+  branches:
+    only:
+      - release
+
+  configuration: Release
+  build_script:
+  - appveyor-retry dotnet restore -v Minimal
+  - dotnet build -c %CONFIGURATION%
+  - dotnet pack -c %CONFIGURATION% --no-build /p:Version=%APPVEYOR_BUILD_VERSION% -o ../../artifacts
+  - del .\artifacts\*test*
+  - del .\artifacts\*Example*
+  
+# test branch produces a nuget package with the version suffix added.
+-
+  branches:
+    only:
+      - test
+
+  configuration: Debug
+  build_script:
+  - appveyor-retry dotnet restore -v Minimal
+  - dotnet build -c %CONFIGURATION%
+  - dotnet pack -c %CONFIGURATION% --no-build /p:Version=%APPVEYOR_BUILD_VERSION%-ALPHA -o ../../artifacts
+  - del .\artifacts\*test*
+  - del .\artifacts\*Example*
+  
+# master and dev branchs runs test only, no publishing packages
+-
+  branches:
+    only:
+      - master
+      - /dev-.*/
+
+  configuration: Debug
+  build_script:
+  - appveyor-retry dotnet restore -v Minimal
+  - dotnet build -c %CONFIGURATION%
+  
+  
+  
