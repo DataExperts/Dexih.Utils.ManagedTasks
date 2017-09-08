@@ -20,7 +20,7 @@ dotnet_csproj:
 
 test_script:
   - appveyor-retry dotnet restore -v Minimal
-  - dotnet test -c %CONFIGURATION% .\test\ManagedTasksTests\
+  - dotnet test -c %CONFIGURATION% .\test\ManageTasksTests\
 artifacts:
   - path: artifacts\*.nupkg
 deploy:
