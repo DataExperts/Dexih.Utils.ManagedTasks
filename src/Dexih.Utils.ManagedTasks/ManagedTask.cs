@@ -77,6 +77,7 @@ namespace dexih.utils.ManagedTasks
         /// </summary>
         public bool DepedenciesMet {
             get => _dependenciesMet || DependentReferences == null || DependentReferences.Length == 0;
+            set => _dependenciesMet = value;
         }
 
         /// <summary>
@@ -94,15 +95,14 @@ namespace dexih.utils.ManagedTasks
 
         private Timer _timer;
 
-        private Task _eventManager;
+        // private Task _eventManager;
 
         private void SetStatus(EManagedTaskStatus newStatus)
         {
             if(newStatus > Status)
             {
                 Status = newStatus;
-                if (Status == EManagedTaskStatus.Completed) Console.WriteLine("Task Completed");
-                 OnStatus?.Invoke(this, Status);
+                OnStatus?.Invoke(this, Status);
             }
         }
 
@@ -125,7 +125,7 @@ namespace dexih.utils.ManagedTasks
                         {
                             // keep creating a new progress event until the flag is not set.
                             // this allows code to keep running whilst a progress event runs in the background.
-                            // if also ensures progress events are only send one at a time.
+                            // if also ensures progress events are only sent one at a time.
                             do
                             {
                                 _anotherProgressInvoke = false;
@@ -196,7 +196,7 @@ namespace dexih.utils.ManagedTasks
 
         public void TriggerReady(ManagedTaskTrigger trigger)
         {
-            OnTrigger.Invoke(this, EventArgs.Empty);
+            OnTrigger?.Invoke(this, EventArgs.Empty);
         }
 
         public void Queue()
@@ -307,11 +307,6 @@ namespace dexih.utils.ManagedTasks
             //if (_timer != null) _timer.Dispose();
             Status = EManagedTaskStatus.Created;
             // SetStatus(EManagedTaskStatus.Created);
-        }
-
-        public void SetDepdenciesMet()
-        {
-            _dependenciesMet = true;
         }
 
         public void Dispose()

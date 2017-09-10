@@ -11,32 +11,48 @@ namespace dexih.utils.ManagedTasks
 	/// <summary>
 	/// Simple collection of managed tasks
 	/// </summary>
-	public class ManagedTasks : IEnumerable<ManagedTask>
+	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable
 	{
 		public event EventHandler<EManagedTaskStatus> OnStatus;
 		public event EventHandler<int> OnProgress;
 
-		private readonly ConcurrentDictionary<string , ManagedTask> _activeTasks;
+        public long CreatedCount { get; set; } = 0;
+        public long ScheduledCount { get; set; } = 0;
+        public long QueuedCount { get; set; } = 0;
+        public long RunningCount { get; set; } = 0;
+        public long CompletedCount { get; set; } = 0;
+        public long ErrorCount { get; set; } = 0;
+        public long CancelCount { get; set; } = 0;
+
+        public object _incrementLock = 1; //used to lock the increment counters, to avoid race conditions.
+
+        private readonly ConcurrentDictionary<string , ManagedTask> _activeTasks;
 		private readonly ConcurrentDictionary<(string category, long categoryKey), ManagedTask> _activeCategoryTasks;
 		private readonly ConcurrentDictionary<(string category, long categoryKey), ManagedTask> _completedTasks;
 
         private object _updateTasksLock = 1; // used to lock when updaging task queues.
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
 		private AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
-		private ManagedTaskHandler _taskHandler;
+
+        private int _resetRunningCount = 0;
+
+		public ManagedTaskHandler TaskHandler { get; protected set; }
 
 		public ManagedTasks(ManagedTaskHandler taskHandler = null)
 		{
 			if (taskHandler == null)
 			{
-				_taskHandler = new ManagedTaskHandler();
+				TaskHandler = new ManagedTaskHandler();
 			}
 			else
 			{
-				_taskHandler = taskHandler;
+				TaskHandler = taskHandler;
 			}
 
-			_activeTasks = new ConcurrentDictionary<string, ManagedTask>();
+            TaskHandler.OnStatus += StatusChange;
+            TaskHandler.OnProgress += ProgressChange;
+
+            _activeTasks = new ConcurrentDictionary<string, ManagedTask>();
 			_activeCategoryTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
 			_completedTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
 			_resetWhenNoTasks = new AutoResetEvent(false);
@@ -44,8 +60,6 @@ namespace dexih.utils.ManagedTasks
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
-			managedTask.OnStatus += StatusChange;
-			managedTask.OnProgress += ProgressChange;
 
 			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CatagoryKey >= 0 && _activeCategoryTasks.ContainsKey((managedTask.Category, managedTask.CatagoryKey)))
 			{
@@ -60,7 +74,7 @@ namespace dexih.utils.ManagedTasks
 			// if there are no depdencies, put the task immediately on the queue.
 			if ((managedTask.Triggers == null || managedTask.Triggers.Count() == 0) && (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
 			{
-				_taskHandler.Add(managedTask);
+				TaskHandler.Add(managedTask);
 			}
 			else
 			{
@@ -145,7 +159,7 @@ namespace dexih.utils.ManagedTasks
 		private void Trigger(object sender, EventArgs e)
 		{
 			var managedTask = (ManagedTask)sender;
-			_taskHandler.Add(managedTask);
+			TaskHandler.Add(managedTask);
 		}
 
 		private void StatusChange(object sender, EManagedTaskStatus newStatus)
@@ -154,24 +168,41 @@ namespace dexih.utils.ManagedTasks
 			{
 				var managedTask = (ManagedTask)sender;
 
-				switch (newStatus)
-				{
-					case EManagedTaskStatus.Created:
-						break;
-					case EManagedTaskStatus.Scheduled:
-						break;
-					case EManagedTaskStatus.Queued:
-						break;
-					case EManagedTaskStatus.Running:
-						break;
-					case EManagedTaskStatus.Completed:
-					case EManagedTaskStatus.Error:
-					case EManagedTaskStatus.Cancelled:
-						ResetCompletedTask(managedTask);
-						break;
-				}
+                lock (_incrementLock)
+                {
+                    switch (newStatus)
+                    {
+                        case EManagedTaskStatus.Created:
+                            CreatedCount++;
+                            break;
+                        case EManagedTaskStatus.Scheduled:
+                            ScheduledCount++;
+                            break;
+                        case EManagedTaskStatus.Queued:
+                            QueuedCount++;
+                            break;
+                        case EManagedTaskStatus.Running:
+                            RunningCount++;
+                            break;
+                        case EManagedTaskStatus.Completed:
+                            CompletedCount++;
+                            break;
+                        case EManagedTaskStatus.Error:
+                            ErrorCount++;
+                            break;
+                        case EManagedTaskStatus.Cancelled:
+                            CancelCount++;
+                            break;
+                    }
+                }
 
-				OnStatus?.Invoke(sender, newStatus);
+                // if the status is finished (eg completed, cancelled, error) when remove the task and look for new tasks.
+                if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled || newStatus == EManagedTaskStatus.Error)
+                {
+                    ResetCompletedTask(managedTask);
+                }
+
+                OnStatus?.Invoke(sender, newStatus);
 			}
 			catch (Exception ex)
 			{
@@ -180,60 +211,68 @@ namespace dexih.utils.ManagedTasks
 			}
 		}
 
-		private void ResetCompletedTask(ManagedTask managedTask)
-		{
-			if (managedTask.Schedule())
-			{
-				managedTask.Reset();
-				//_taskHandler.Add(managedTask);
-			}
-			else
-			{
-                if(!_activeTasks.ContainsKey(managedTask.Reference))
+        private void ResetCompletedTask(ManagedTask managedTask)
+        {
+            _resetRunningCount++;
+
+            if (managedTask.Schedule())
+            {
+                managedTask.Reset();
+                //_taskHandler.Add(managedTask);
+            }
+            else
+            {
+                if (!_activeTasks.ContainsKey(managedTask.Reference))
                 {
                     return;
                 }
 
-				if (!_activeTasks.TryRemove(managedTask.Reference, out ManagedTask activeTask))
-				{
-					_exitException = new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
-					_resetWhenNoTasks.Set();
-				}
+                if (!_activeTasks.TryRemove(managedTask.Reference, out ManagedTask activeTask))
+                {
+                    _exitException = new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
+                    _resetWhenNoTasks.Set();
+                }
 
-				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CatagoryKey), activeTask, (oldKey, oldValue) => activeTask);
-			}
+                _completedTasks.AddOrUpdate((activeTask.Category, activeTask.CatagoryKey), activeTask, (oldKey, oldValue) => activeTask);
+            }
 
-			foreach (var activeTask in _activeTasks.Values)
-			{
-				if (activeTask.DependentReferences != null && activeTask.DependentReferences.Length > 0)
-				{
-					var depFound = false;
-					foreach (var dep in activeTask.DependentReferences)
-					{
-						if (_activeTasks.ContainsKey(dep))
-						{
-							depFound = true;
-							break;
-						}
-					}
+            // check all active tasks, to see if the dependency conditions have been met.
+            foreach (var activeTask in _activeTasks.Values)
+            {
+                if (activeTask.DependentReferences != null && activeTask.DependentReferences.Length > 0)
+                {
+                    var depFound = false;
+                    foreach (var dep in activeTask.DependentReferences)
+                    {
+                        if (_activeTasks.ContainsKey(dep))
+                        {
+                            depFound = true;
+                            break;
+                        }
+                    }
 
-					// if no depdent tasks are found, then the current task is ready to go.
-					if (!depFound)
-					{
-						activeTask.SetDepdenciesMet();
-						if (activeTask.Schedule())
-						{
-							_taskHandler.Add(activeTask);
-						}
-					}
-				}
-			}
+                    // if no depdent tasks are found, then the current task is ready to go.
+                    if (!depFound)
+                    {
+                        // check dependencies are not already met is not already set, which can happen when two depdent tasks finish at the same time.
+                        if (!activeTask.DepedenciesMet)
+                        {
+                            activeTask.DepedenciesMet = true;
+                            if (activeTask.Schedule())
+                            {
+                                TaskHandler.Add(activeTask);
+                            }
+                        }
+                    }
+                }
+            }
 
-			if (_activeTasks.Count == 0)
+            _resetRunningCount--;
+
+			if (_activeTasks.Count == 0 && _resetRunningCount == 0)
 			{
 				_resetWhenNoTasks.Set();
 			}
-
 		}
 
 		public void ProgressChange(object sender, int percentage)
@@ -250,7 +289,7 @@ namespace dexih.utils.ManagedTasks
 
 		public async Task WhenAll(CancellationToken cancellationToken)
 		{
-			if (_activeTasks.Count > 0)
+			while (_activeTasks.Count > 0 && _resetRunningCount == 0)
 			{
 				var noTasks = Task.Run(() => _resetWhenNoTasks.WaitOne());
 				await Task.WhenAny(noTasks, Task.Delay(-1, cancellationToken));
@@ -259,6 +298,11 @@ namespace dexih.utils.ManagedTasks
 				{
 					throw _exitException;
 				}
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
 			}
 		}
 
@@ -311,5 +355,13 @@ namespace dexih.utils.ManagedTasks
 				}
 			}
 		}
-	}
+
+        public void Dispose()
+        {
+            TaskHandler.WhenAll().Wait();
+            TaskHandler.Dispose();
+            OnProgress = null;
+            OnStatus = null;
+        }
+    }
 }
