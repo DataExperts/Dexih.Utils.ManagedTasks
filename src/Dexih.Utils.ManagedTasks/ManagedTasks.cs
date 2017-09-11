@@ -94,12 +94,12 @@ namespace dexih.utils.ManagedTasks
 			return managedTask;
 		}
 
-        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
             return Add(originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers)
+        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
             return Add(originatorId, name, category, 0, 0, data, action, triggers, null);
         }
@@ -109,18 +109,18 @@ namespace dexih.utils.ManagedTasks
             return Add(originatorId, name, category, 0, 0, data, action, null, null);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
 			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, dependentReferences);
 		}
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
             return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
         }
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
             return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null);
         }
@@ -137,7 +137,7 @@ namespace dexih.utils.ManagedTasks
         /// <param name="title">Short description of the task.</param>
         /// <param name="action">The action </param>
         /// <returns></returns>
-        public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask()
 			{
@@ -217,8 +217,8 @@ namespace dexih.utils.ManagedTasks
 
             if (managedTask.Schedule())
             {
+                managedTask.OnTrigger += Trigger;
                 managedTask.Reset();
-                //_taskHandler.Add(managedTask);
             }
             else
             {

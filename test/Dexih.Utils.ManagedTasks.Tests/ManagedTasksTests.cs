@@ -388,12 +388,12 @@ namespace dexih.functions.tests
             }
 
             // set a trigger 5 seconds in the future
-            var trigger = new ManagedTaskTrigger()
+            var trigger = new ManagedTaskSchedule()
             {
                 StartDate = DateTime.Now.AddSeconds(5)
             };
 
-            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new ManagedTaskTrigger[] { trigger }, null);
+            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new ManagedTaskSchedule[] { trigger }, null);
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -408,14 +408,17 @@ namespace dexih.functions.tests
         {
             var managedTasks = new ManagedTasks();
 
+            var startTime = DateTime.Now.TimeOfDay;
+
             // simple task that takes 1 second to run
             async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
             {
+                output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime).ToString());
                 await Task.Delay(1000, cancellationToken);
             }
 
             // starts in 1 second, then runs 1 second job
-            var trigger = new ManagedTaskTrigger()
+            var trigger = new ManagedTaskSchedule()
             {
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(1).TimeOfDay,
@@ -423,14 +426,16 @@ namespace dexih.functions.tests
                 MaxRecurrs = 5
             };
 
-            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new ManagedTaskTrigger[] { trigger }, null);
+            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new ManagedTaskSchedule[] { trigger }, null);
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
             await managedTasks.WhenAll(cts.Token);
 
-            // 12 seconds = Initial 1 + 2 *5 recurrs + 1 final job
-            Assert.True(trigger.StartDate.Value.AddSeconds(12) < DateTime.Now);
+            Assert.Equal(5, managedTasks.CompletedCount);
+
+            // 10 seconds = Initial 1 + 2 *(5-1) recurrs + 1 final job
+            Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
         }
     }
 }

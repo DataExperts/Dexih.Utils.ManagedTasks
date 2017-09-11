@@ -21,17 +21,17 @@ namespace dexih.utils.ManagedTasks
 
     public class ManagedTaskTriggerException: Exception
     {
-        public ManagedTaskTrigger ManagedTaskTrigger { get; protected set; }
+        public ManagedTaskSchedule ManagedTaskTrigger { get; protected set; }
 
-        public ManagedTaskTriggerException(ManagedTaskTrigger managedTaskTrigger)
+        public ManagedTaskTriggerException(ManagedTaskSchedule managedTaskTrigger)
         {
             ManagedTaskTrigger = managedTaskTrigger;
         }
-        public ManagedTaskTriggerException(ManagedTaskTrigger managedTaskTrigger, string message) : base(message)
+        public ManagedTaskTriggerException(ManagedTaskSchedule managedTaskTrigger, string message) : base(message)
         {
             ManagedTaskTrigger = managedTaskTrigger;
         }
-        public ManagedTaskTriggerException(ManagedTaskTrigger managedTaskTrigger, string message, Exception innerException) : base(message, innerException)
+        public ManagedTaskTriggerException(ManagedTaskSchedule managedTaskTrigger, string message, Exception innerException) : base(message, innerException)
         {
             ManagedTaskTrigger = managedTaskTrigger;
         }

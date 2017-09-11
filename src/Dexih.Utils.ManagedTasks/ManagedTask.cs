@@ -59,7 +59,7 @@ namespace dexih.utils.ManagedTasks
 
         public int Percentage { get; set; }
 
-        public IEnumerable<ManagedTaskTrigger> Triggers { get; set; }
+        public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
 
         public DateTime? NextTriggerTime { get; protected set; }
 
@@ -162,10 +162,10 @@ namespace dexih.utils.ManagedTasks
             {
                 // loop through the triggers to find the one scheduled the soonest.
                 DateTime? startAt = null;
-                ManagedTaskTrigger startTrigger = null;
+                ManagedTaskSchedule startTrigger = null;
                 foreach (var trigger in Triggers)
                 {
-                    var triggerTime = trigger.NextTrigger();
+                    var triggerTime = trigger.NextOcurrance(DateTime.Now);
                     if (triggerTime != null && (startAt == null || triggerTime < startAt))
                     {
                         startAt = triggerTime;
@@ -194,7 +194,7 @@ namespace dexih.utils.ManagedTasks
             return allowSchedule;
         }
 
-        public void TriggerReady(ManagedTaskTrigger trigger)
+        public void TriggerReady(ManagedTaskSchedule trigger)
         {
             OnTrigger?.Invoke(this, EventArgs.Empty);
         }
