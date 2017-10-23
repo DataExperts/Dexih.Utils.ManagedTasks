@@ -46,8 +46,9 @@ namespace dexih.functions.tests
         {
             var handler = new ManagedTaskHandler();
 
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
+                await Task.Delay(1);
             }
 
             for (int i = 0; i < TaskCount; i++)
@@ -76,12 +77,12 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i <= 5; i++)
                 {
                     await Task.Delay(20, cancellationToken);
-                    progress.Report(i * 20);
+                    progress.Report(i * 20, "step:" + (i*20));
                 }
             }
 
@@ -107,13 +108,20 @@ namespace dexih.functions.tests
             Assert.True(progressCounter > 0);
         }
 
+        void Progress(Object sender, ManagedTaskProgressItem progressItem)
+        {
+            Assert.True(progressItem.Percentage > progressCounter);
+            Assert.Equal(progressItem.StepName, "step:" + progressItem.Percentage);
+            progressCounter = progressItem.Percentage;
+        }
+
         [Fact]
         public async Task Test_ManagedTasks_WithKeys()
         {
             var managedTasks = new ManagedTasks();
 
             // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i <= 5; i++)
                 {
@@ -140,13 +148,7 @@ namespace dexih.functions.tests
             Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
         }
 
-        void Progress(Object sender, int percentage)
-        {
-            var task = (ManagedTask)sender;
-            Assert.True(percentage > progressCounter);
-            //Assert.Equal(EManagedTaskStatus.Running, task.Status);
-            progressCounter = percentage;
-        }
+
 
         [Theory]
         [InlineData(50)]
@@ -158,7 +160,7 @@ namespace dexih.functions.tests
             managedTasks.OnStatus += CompletedCounter;
 
             // simple task reports progress 10 times.
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i < 10; i++)
                 {
@@ -227,7 +229,7 @@ namespace dexih.functions.tests
                 var taskCount = 0;
 
                 // task throws an error.
-                async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+                async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
                 {
                     taskCount++;
                     await Task.Run(() => throw new Exception("An error"));
@@ -273,7 +275,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that can be cancelled
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 try
                 {
@@ -329,7 +331,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -355,7 +357,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -382,7 +384,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds to run
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -411,7 +413,7 @@ namespace dexih.functions.tests
             var startTime = DateTime.Now.TimeOfDay;
 
             // simple task that takes 1 second to run
-            async Task Action(IProgress<int> progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime).ToString());
                 await Task.Delay(1000, cancellationToken);
