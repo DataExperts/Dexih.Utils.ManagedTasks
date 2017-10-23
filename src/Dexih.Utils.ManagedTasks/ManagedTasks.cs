@@ -14,7 +14,7 @@ namespace dexih.utils.ManagedTasks
 	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable
 	{
 		public event EventHandler<EManagedTaskStatus> OnStatus;
-		public event EventHandler<int> OnProgress;
+		public event EventHandler<ManagedTaskProgressItem> OnProgress;
 
         public long CreatedCount { get; set; } = 0;
         public long ScheduledCount { get; set; } = 0;
@@ -72,7 +72,7 @@ namespace dexih.utils.ManagedTasks
 			}
 
 			// if there are no depdencies, put the task immediately on the queue.
-			if ((managedTask.Triggers == null || managedTask.Triggers.Count() == 0) && (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
+			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) && (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
 			{
 				TaskHandler.Add(managedTask);
 			}
@@ -94,50 +94,57 @@ namespace dexih.utils.ManagedTasks
 			return managedTask;
 		}
 
-        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
             return Add(originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
+        public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
             return Add(originatorId, name, category, 0, 0, data, action, triggers, null);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action)
+        public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action)
         {
             return Add(originatorId, name, category, 0, 0, data, action, null, null);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
 			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, dependentReferences);
 		}
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
             return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
         }
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
             return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null);
         }
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<IProgress<int>, CancellationToken, Task> action)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action)
         {
             return Add(reference, originatorId, name, category, 0, 0, data, action, null, null);
         }
 
-        /// <summary>
-        /// Creates & starts a new managed task.
-        /// </summary>
-        /// <param name="originatorId">Id that can be used to referernce where the task was started from.</param>
-        /// <param name="title">Short description of the task.</param>
-        /// <param name="action">The action </param>
-        /// <returns></returns>
-        public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<IProgress<int>, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+		/// <summary>
+		/// Creates & starts a new managed task.
+		/// </summary>
+		/// <param name="reference"></param>
+		/// <param name="originatorId">Id that can be used to referernce where the task was started from.</param>
+		/// <param name="data"></param>
+		/// <param name="action">The action </param>
+		/// <param name="name"></param>
+		/// <param name="category"></param>
+		/// <param name="hubKey"></param>
+		/// <param name="categoryKey"></param>
+		/// <param name="triggers"></param>
+		/// <param name="dependentReferences"></param>
+		/// <returns></returns>
+		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask()
 			{
@@ -227,7 +234,7 @@ namespace dexih.utils.ManagedTasks
                     return;
                 }
 
-                if (!_activeTasks.TryRemove(managedTask.Reference, out ManagedTask activeTask))
+                if (!_activeTasks.TryRemove(managedTask.Reference, out var activeTask))
                 {
                     _exitException = new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
                     _resetWhenNoTasks.Set();
@@ -275,14 +282,14 @@ namespace dexih.utils.ManagedTasks
 			}
 		}
 
-		public void ProgressChange(object sender, int percentage)
+		public void ProgressChange(object sender, ManagedTaskProgressItem progress)
 		{
-			OnProgress?.Invoke(sender, percentage);
+			OnProgress?.Invoke(sender, progress);
 		}
 
 		public Task WhenAll()
 		{
-			CancellationToken cancellationToken = CancellationToken.None;
+			var cancellationToken = CancellationToken.None;
 			return WhenAll(cancellationToken);
 		}
 

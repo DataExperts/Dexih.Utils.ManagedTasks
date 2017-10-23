@@ -12,7 +12,7 @@ namespace dexih.utils.ManagedTasks
         private readonly int _maxConcurrent;
 
         public event EventHandler<EManagedTaskStatus> OnStatus;
-        public event EventHandler<int> OnProgress;
+        public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTasksCompleted;
 
         public long CreatedCount { get; set; } = 0;
@@ -121,22 +121,21 @@ namespace dexih.utils.ManagedTasks
             }
         }
 
-        public void ProgressChanged(object sender, int percentage)
+        public void ProgressChanged(object sender, ManagedTaskProgressItem progress)
         {
             var managedTask = (ManagedTask)sender;
 
             //store most recent update
             _taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask);
 
-            OnProgress?.Invoke(sender, percentage);
+            OnProgress?.Invoke(sender, progress);
         }
 
         private void ResetCompletedTask(ManagedTask managedTask)
         {
             lock (_updateTasksLock)
             {
-                ManagedTask finishedTask;
-                if (!_runningTasks.TryRemove(managedTask.Reference, out finishedTask))
+                if (!_runningTasks.TryRemove(managedTask.Reference, out var finishedTask))
                 {
                     _exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
                     _resetWhenNoTasks.Set();
@@ -160,9 +159,7 @@ namespace dexih.utils.ManagedTasks
             // update the running queue
             while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
             {
-                ManagedTask queuedTask;
-
-                if (!_queuedTasks.TryDequeue(out queuedTask))
+                if (!_queuedTasks.TryDequeue(out var queuedTask))
                 {
                     // something wrong with concurrency if this is hit.
                     _exitException = new ManagedTaskException(queuedTask, "Failed to remove the task from the queued tasks list.");

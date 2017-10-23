@@ -138,7 +138,7 @@ namespace dexih.utils.ManagedTasks
         {
             get
             {
-                StringBuilder desc = new StringBuilder();
+                var desc = new StringBuilder();
 
                 switch (IntervalType)
                 {
@@ -364,11 +364,11 @@ namespace dexih.utils.ManagedTasks
 
         private DateTime? NextOccurranceInterval(DateTime fromDate)
         {
-            TimeSpan dailyStart = StartTime == null ? new TimeSpan(0, 0, 0) : (TimeSpan)StartTime;
-            TimeSpan dailyEnd = EndTime == null ? new TimeSpan(23, 59, 59) : (TimeSpan)EndTime;
+            var dailyStart = StartTime == null ? new TimeSpan(0, 0, 0) : (TimeSpan)StartTime;
+            var dailyEnd = EndTime == null ? new TimeSpan(23, 59, 59) : (TimeSpan)EndTime;
 
             //set the initial start date
-            DateTime startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : (DateTime)StartDate.Value.Date;
+            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : (DateTime)StartDate.Value.Date;
 
             if (DaysOfWeek != null && DaysOfWeek.Length == 0)
             {
@@ -381,7 +381,7 @@ namespace dexih.utils.ManagedTasks
             }
 
             //loop through until we find a valid date.
-            int validDateCounter = 0;
+            var validDateCounter = 0;
             while (!IsValidDate(startAt))
             {
                 startAt = startAt.AddDays(1);
@@ -396,8 +396,8 @@ namespace dexih.utils.ManagedTasks
 
             //Combine that start date and time to get a final start date/time
             startAt = startAt.Add(dailyStart);
-            bool passDate = true;
-            int recurrs = 1;
+            var passDate = true;
+            var recurrs = 1;
 
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
@@ -453,7 +453,7 @@ namespace dexih.utils.ManagedTasks
                     }
                     else
                     {
-                        for (int i = 0; i < 6; i++)
+                        for (var i = 0; i < 6; i++)
                         {
                             startAt = startAt.AddDays(1);
                             if (DaysOfWeek.Contains(DayOfWeek(startAt)))

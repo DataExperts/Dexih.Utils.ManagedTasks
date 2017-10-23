@@ -11,13 +11,13 @@ namespace dexih.utils.ManagedTasks
     [JsonConverter(typeof(StringEnumConverter))]
     public enum EManagedTaskStatus
     {
-        Created, Paused, Scheduled, Queued, Running, Cancelled, Error, Completed
+        Created, Scheduled, Queued, Running, Cancelled, Error, Completed
     }
     
     public class ManagedTask: IDisposable
     {
         public event EventHandler<EManagedTaskStatus> OnStatus;
-        public event EventHandler<int> OnProgress;
+        public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTrigger;
 
         public bool Success { get; set; }
@@ -58,6 +58,7 @@ namespace dexih.utils.ManagedTasks
 		public long HubKey { get; set; }
 
         public int Percentage { get; set; }
+        public string StepName { get; set; }
 
         public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
 
@@ -84,12 +85,12 @@ namespace dexih.utils.ManagedTasks
         /// Action that will be started and executed when the task starts.
         /// </summary>
         [JsonIgnore]
-        public Func<IProgress<int>, CancellationToken, Task> Action { get; set; }
+        public Func<ManagedTaskProgress, CancellationToken, Task> Action { get; set; }
 
         private CancellationTokenSource _cancellationTokenSource;
         
         private Task _task;
-        private readonly IProgress<int> _progress;
+        private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
         private bool _anotherProgressInvoke = false;
 
@@ -113,11 +114,13 @@ namespace dexih.utils.ManagedTasks
             _cancellationTokenSource = new CancellationTokenSource();
 
             // progress routine which calls the progress event async 
-            _progress = new Progress<int>(value =>
+            _progress = new ManagedTaskProgress(value =>
             {
-                if (Percentage != value)
+                if (Percentage != value.Percentage || StepName != value.StepName)
                 {
-                    Percentage = value;
+                    Percentage = value.Percentage;
+                    StepName = value.StepName;
+                    
                     // if the previous progress has finished?
                     if (_progressInvoke == null || _progressInvoke.IsCompleted)
                     {
@@ -129,7 +132,7 @@ namespace dexih.utils.ManagedTasks
                             do
                             {
                                 _anotherProgressInvoke = false;
-                                OnProgress?.Invoke(this, Percentage);
+                                OnProgress?.Invoke(this, value);
                             } while (_anotherProgressInvoke);
                         });
                     }
@@ -151,12 +154,7 @@ namespace dexih.utils.ManagedTasks
                 throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status.ToString());
             }
 
-            bool allowSchedule = false;
-
-            if(DependentReferences != null && DependentReferences.Length > 0 && DepedenciesMet && RunCount == 0)
-            {
-                allowSchedule = true;
-            }
+            var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DepedenciesMet && RunCount == 0;
 
             if (Triggers != null)
             {
@@ -291,8 +289,8 @@ namespace dexih.utils.ManagedTasks
             Success = false;
             Message = "The task was cancelled.";
             SetStatus(EManagedTaskStatus.Cancelled);
-			if (_timer != null) _timer.Dispose();
-		}
+            _timer?.Dispose();
+        }
 
         public void Error(string message, Exception ex)
         {
@@ -311,7 +309,7 @@ namespace dexih.utils.ManagedTasks
 
         public void Dispose()
         {
-            if (_timer != null) _timer.Dispose();
+            _timer?.Dispose();
             OnProgress = null;
             OnStatus = null;
             OnTrigger = null;
