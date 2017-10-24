@@ -60,6 +60,14 @@ namespace dexih.utils.ManagedTasks
         public int Percentage { get; set; }
         public string StepName { get; set; }
 
+        public bool IsCompleted 
+        { 
+            get
+            {
+                return Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
+            }
+        }
+
         public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
 
         public DateTime? NextTriggerTime { get; protected set; }
