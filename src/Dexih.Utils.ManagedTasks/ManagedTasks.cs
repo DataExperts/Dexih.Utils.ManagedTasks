@@ -32,7 +32,7 @@ namespace dexih.utils.ManagedTasks
 
         private object _updateTasksLock = 1; // used to lock when updaging task queues.
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
-		private AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
+		private readonly AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
 
         private int _resetRunningCount = 0;
 

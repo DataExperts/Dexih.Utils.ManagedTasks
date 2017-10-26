@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Newtonsoft.Json.Converters;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace dexih.utils.ManagedTasks
 {
@@ -22,6 +23,8 @@ namespace dexih.utils.ManagedTasks
 
         public bool Success { get; set; }
         public string Message { get; set; }
+        
+        [JsonIgnore]
         public Exception Exception { get; set; }
 
         /// <summary>
@@ -51,7 +54,7 @@ namespace dexih.utils.ManagedTasks
 
         public EManagedTaskStatus Status { get; set; }
 
-        public Object Data { get; set; }
+        public object Data { get; set; }
 
         public string Category { get; set; }
 		public long CatagoryKey { get; set; }
@@ -322,6 +325,36 @@ namespace dexih.utils.ManagedTasks
             OnStatus = null;
             OnTrigger = null;
            // _cancellationTokenSource.Dispose();
+        }
+        
+
+        /// <summary>
+        /// Full trace of the exception.  This can either be set to a value, or 
+        /// will be constructed from the exception.
+        /// </summary>
+        public virtual string ExceptionDetails
+        {
+            get
+            {
+                if (Exception != null)
+                {
+                    var properties = Exception.GetType().GetProperties();
+                    var fields = properties
+                        .Select(property => new
+                        {
+                            property.Name,
+                            Value = property.GetValue(Exception, null)
+                        })
+                        .Select(x => string.Format(
+                            "{0} = {1}",
+                            x.Name,
+                            x.Value != null ? x.Value.ToString() : string.Empty
+                        ));
+                    return Message + "\n" + string.Join("\n", fields);
+                }
+
+                return "";
+            }
         }
     }
 }
