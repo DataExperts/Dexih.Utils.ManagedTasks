@@ -326,7 +326,8 @@ namespace dexih.utils.ManagedTasks
             OnTrigger = null;
            // _cancellationTokenSource.Dispose();
         }
-        
+
+        private string _exceptionDetails;
 
         /// <summary>
         /// Full trace of the exception.  This can either be set to a value, or 
@@ -336,6 +337,10 @@ namespace dexih.utils.ManagedTasks
         {
             get
             {
+                if (!string.IsNullOrEmpty(_exceptionDetails))
+                {
+                    return _exceptionDetails;
+                }
                 if (Exception != null)
                 {
                     var properties = Exception.GetType().GetProperties();
@@ -355,6 +360,7 @@ namespace dexih.utils.ManagedTasks
 
                 return "";
             }
+            set => _exceptionDetails = value;
         }
     }
 }
