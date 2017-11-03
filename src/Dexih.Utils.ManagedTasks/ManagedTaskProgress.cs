@@ -12,7 +12,7 @@ namespace dexih.utils.ManagedTasks
 
         public void Report(int percentage)
         {
-            var progress = new ManagedTaskProgressItem()
+            var progress = new ManagedTaskProgressItem
             {
                 Percentage = percentage,
                 StepName = _previousProgressItem?.StepName
@@ -25,7 +25,7 @@ namespace dexih.utils.ManagedTasks
         
         public void Report(string stepName)
         {
-            var progress = new ManagedTaskProgressItem()
+            var progress = new ManagedTaskProgressItem
             {
                 Percentage = _previousProgressItem?.Percentage ?? 0,
                 StepName = stepName
@@ -38,7 +38,7 @@ namespace dexih.utils.ManagedTasks
         
         public void Report(int percentage, string stepName)
         {
-            var progress = new ManagedTaskProgressItem()
+            var progress = new ManagedTaskProgressItem
             {
                 Percentage = percentage,
                 StepName = stepName

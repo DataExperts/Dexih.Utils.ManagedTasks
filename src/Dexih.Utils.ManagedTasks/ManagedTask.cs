@@ -1,11 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Newtonsoft.Json.Converters;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace dexih.utils.ManagedTasks
 {
@@ -75,7 +74,7 @@ namespace dexih.utils.ManagedTasks
 
         public DateTime? NextTriggerTime { get; protected set; }
 
-        public int RunCount { get; protected set; } = 0;
+        public int RunCount { get; protected set; }
 
         /// <summary>
         /// Array of task reference which must be complete prior to this task.
@@ -103,7 +102,7 @@ namespace dexih.utils.ManagedTasks
         private Task _task;
         private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
-        private bool _anotherProgressInvoke = false;
+        private bool _anotherProgressInvoke;
 
         private Timer _timer;
 
@@ -162,7 +161,7 @@ namespace dexih.utils.ManagedTasks
         {
             if(Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled)
             {
-                throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status.ToString());
+                throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status);
             }
 
             var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DepedenciesMet && RunCount == 0;
@@ -212,7 +211,7 @@ namespace dexih.utils.ManagedTasks
         {
             if (Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled)
             {
-                throw new ManagedTaskException(this, "The task cannot be queued for execution as the status is already set to " + Status.ToString());
+                throw new ManagedTaskException(this, "The task cannot be queued for execution as the status is already set to " + Status);
             }
             SetStatus(EManagedTaskStatus.Queued);
         }
@@ -278,8 +277,6 @@ namespace dexih.utils.ManagedTasks
                     }
 
                     Percentage = 100;
-                    return;
-
                 }
                 catch (Exception ex)
                 {
@@ -288,7 +285,6 @@ namespace dexih.utils.ManagedTasks
                     Success = false;
                     SetStatus(EManagedTaskStatus.Error);
                     Percentage = 100;
-                    return;
                 }
 
             }); //.ContinueWith((o) => Dispose());

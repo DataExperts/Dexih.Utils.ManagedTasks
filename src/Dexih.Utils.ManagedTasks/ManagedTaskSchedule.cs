@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using System;
-using System.Collections.Generic;
+﻿using System;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace dexih.utils.ManagedTasks
 {
@@ -34,7 +34,7 @@ namespace dexih.utils.ManagedTasks
             Once,
             Interval,
             Daily,
-            Monthly,
+            Monthly
         }
 
         [JsonConverter(typeof(StringEnumConverter))]
@@ -52,12 +52,12 @@ namespace dexih.utils.ManagedTasks
         /// <summary>
         /// Create a trigger that starts at the specified time and executes once.
         /// </summary>
-        /// <param name="StartAt">Start At Date</param>
-        public ManagedTaskSchedule(DateTime StartAt)
+        /// <param name="startAt">Start At Date</param>
+        public ManagedTaskSchedule(DateTime startAt)
         {
             IntervalType = EIntervalType.Once;
-            StartDate = StartAt.Date;
-            StartTime = StartAt.TimeOfDay;
+            StartDate = startAt.Date;
+            StartTime = startAt.TimeOfDay;
         }
 
         /// <summary>
@@ -131,6 +131,9 @@ namespace dexih.utils.ManagedTasks
         /// </summary>
         public int? MaxRecurrs { get; set; }
 
+
+        private string _details;
+        
         /// <summary>
         /// Gets a description of the trigger.
         /// </summary>
@@ -138,6 +141,11 @@ namespace dexih.utils.ManagedTasks
         {
             get
             {
+                if (_details == null)
+                {
+                    return _details;
+                }
+                
                 var desc = new StringBuilder();
 
                 switch (IntervalType)
@@ -153,9 +161,9 @@ namespace dexih.utils.ManagedTasks
                         else
                         {
                             desc.AppendLine($"Starts at {StartDateTimeDesc()}");
-                            desc.AppendLine($"Every {IntervalTime.Value.ToString()}");
+                            if (IntervalTime != null) desc.AppendLine($"Every {IntervalTime.Value.ToString()}");
                             desc.AppendLine("Between " + (StartTime == null ? "00:00:00" : StartTime.Value.ToString()) + " and " + (EndTime == null ? "23:59:59" : EndTime.Value.ToString()));
-                            if (MaxRecurrs != null || MaxRecurrs < 0) desc.AppendLine("Maximum recurrances of " + MaxRecurrs.Value.ToString());
+                            if (MaxRecurrs != null || MaxRecurrs < 0) desc.AppendLine("Maximum recurrances of " + MaxRecurrs.Value);
                         }
                         break;
                     case EIntervalType.Daily:
@@ -168,26 +176,27 @@ namespace dexih.utils.ManagedTasks
 
                 if (DaysOfWeek.Length > 0 && DaysOfWeek.Length < 7)
                 {
-                    desc.AppendLine("Only on day(s):" + String.Join(",", DaysOfWeek.Select(c => c.ToString()).ToArray()));
+                    desc.AppendLine("Only on day(s):" + string.Join(",", DaysOfWeek.Select(c => c.ToString()).ToArray()));
                 }
 
                 if (DaysOfMonth?.Length > 0)
                 {
-                    desc.AppendLine("Only on these day(s) of month:" + String.Join(",", DaysOfMonth.Select(c => c.ToString()).ToArray()));
+                    desc.AppendLine("Only on these day(s) of month:" + string.Join(",", DaysOfMonth.Select(c => c.ToString()).ToArray()));
                 }
 
                 if (WeeksOfMonth?.Length > 0)
                 {
-                    desc.AppendLine("Only on these week(s) of the month:" + String.Join(",", WeeksOfMonth.Select(c => c.ToString()).ToArray()));
+                    desc.AppendLine("Only on these week(s) of the month:" + string.Join(",", WeeksOfMonth.Select(c => c.ToString()).ToArray()));
                 }
 
                 if (SkipDates?.Length > 0)
                 {
-                    desc.AppendLine("Excluding the following specific dates:" + String.Join(",", SkipDates.Select(c => c.ToString()).ToArray()));
+                    desc.AppendLine("Excluding the following specific dates:" + string.Join(",", SkipDates.Select(c => c.ToString(CultureInfo.CurrentCulture)).ToArray()));
                 }
 
                 return desc.ToString();
             }
+            set => _details = value;
         }
 
         private string StartDateTimeDesc()
@@ -196,19 +205,17 @@ namespace dexih.utils.ManagedTasks
             {
                 return "immediately";
             }
-            else if(StartDate == null)
+            if(StartDate == null)
             {
-                return "from time " + StartTime.Value.ToString();
+                if (StartTime != null) return "from time " + StartTime.Value;
+                return "";
             }
-            else
+            var startDateTime = StartDate.Value.Date;
+            if(StartTime != null)
             {
-                var startDateTime = StartDate.Value.Date;
-                if(StartTime != null)
-                {
-                    startDateTime = startDateTime.Add(StartTime.Value);
-                }
-                return "from date " + startDateTime.ToString();
+                startDateTime = startDateTime.Add(StartTime.Value);
             }
+            return "from date " + startDateTime;
         }
 
 
@@ -249,22 +256,16 @@ namespace dexih.utils.ManagedTasks
             {
                 return null;
             }
-            else
+            var startDateTime = StartDate.Value.Date;
+            if (StartTime != null)
             {
-                var startDateTime = StartDate.Value.Date;
-                if (StartTime != null)
-                {
-                    startDateTime = startDateTime.Add(StartTime.Value);
-                }
-                if (startDateTime > fromDate)
-                {
-                    return startDateTime;
-                }
-                else
-                {
-                    return null;
-                }
+                startDateTime = startDateTime.Add(StartTime.Value);
             }
+            if (startDateTime > fromDate)
+            {
+                return startDateTime;
+            }
+            return null;
         }
 
         private DateTime? NextOccurranceMonthly(DateTime fromDate)
@@ -319,10 +320,7 @@ namespace dexih.utils.ManagedTasks
                 }
                 return startDateTime;
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
         private DateTime? NextOccurranceDaily(DateTime fromDate)
@@ -356,10 +354,7 @@ namespace dexih.utils.ManagedTasks
                 }
                 return startDateTime;
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
         private DateTime? NextOccurranceInterval(DateTime fromDate)
@@ -368,7 +363,7 @@ namespace dexih.utils.ManagedTasks
             var dailyEnd = EndTime == null ? new TimeSpan(23, 59, 59) : (TimeSpan)EndTime;
 
             //set the initial start date
-            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : (DateTime)StartDate.Value.Date;
+            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
 
             if (DaysOfWeek != null && DaysOfWeek.Length == 0)
             {

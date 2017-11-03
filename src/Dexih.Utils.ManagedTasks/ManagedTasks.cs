@@ -16,13 +16,13 @@ namespace dexih.utils.ManagedTasks
 		public event EventHandler<EManagedTaskStatus> OnStatus;
 		public event EventHandler<ManagedTaskProgressItem> OnProgress;
 
-        public long CreatedCount { get; set; } = 0;
-        public long ScheduledCount { get; set; } = 0;
-        public long QueuedCount { get; set; } = 0;
-        public long RunningCount { get; set; } = 0;
-        public long CompletedCount { get; set; } = 0;
-        public long ErrorCount { get; set; } = 0;
-        public long CancelCount { get; set; } = 0;
+        public long CreatedCount { get; set; }
+        public long ScheduledCount { get; set; }
+        public long QueuedCount { get; set; }
+        public long RunningCount { get; set; }
+        public long CompletedCount { get; set; }
+        public long ErrorCount { get; set; }
+        public long CancelCount { get; set; }
 
         public object _incrementLock = 1; //used to lock the increment counters, to avoid race conditions.
 
@@ -34,7 +34,7 @@ namespace dexih.utils.ManagedTasks
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
 		private readonly AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
 
-        private int _resetRunningCount = 0;
+        private int _resetRunningCount;
 
 		public ManagedTaskHandler TaskHandler { get; protected set; }
 
@@ -146,7 +146,7 @@ namespace dexih.utils.ManagedTasks
 		/// <returns></returns>
 		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
-			var managedTask = new ManagedTask()
+			var managedTask = new ManagedTask
 			{
 				Reference = reference,
 				OriginatorId = originatorId,
@@ -330,27 +330,21 @@ namespace dexih.utils.ManagedTasks
 
 		public IEnumerable<ManagedTask> GetActiveTasks(string category = null)
 		{
-            if(string.IsNullOrEmpty(category))
+			if(string.IsNullOrEmpty(category))
             {
                 return _activeTasks.Values;
             }
-            else
-            {
-                return _activeTasks.Values.Where(c => c.Category == category);
-            }
-        }
+			return _activeTasks.Values.Where(c => c.Category == category);
+		}
 
 		public IEnumerable<ManagedTask> GetCompletedTasks(string category = null)
 		{
-            if (string.IsNullOrEmpty(category))
+			if (string.IsNullOrEmpty(category))
             {
                 return _completedTasks.Values;
             }
-            else
-            {
-                return _completedTasks.Values.Where(c => c.Category == category);
-            }
-        }
+			return _completedTasks.Values.Where(c => c.Category == category);
+		}
 
 		public void Cancel(string[] references)
 		{

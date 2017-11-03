@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,13 +14,13 @@ namespace dexih.utils.ManagedTasks
         public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTasksCompleted;
 
-        public long CreatedCount { get; set; } = 0;
-        public long ScheduledCount { get; set; } = 0;
-        public long QueuedCount { get; set; } = 0;
-        public long RunningCount { get; set; } = 0;
-        public long CompletedCount { get; set; } = 0;
-        public long ErrorCount { get; set; } = 0;
-        public long CancelCount { get; set; } = 0;
+        public long CreatedCount { get; set; }
+        public long ScheduledCount { get; set; }
+        public long QueuedCount { get; set; }
+        public long RunningCount { get; set; }
+        public long CompletedCount { get; set; }
+        public long ErrorCount { get; set; }
+        public long CancelCount { get; set; }
 
         public object _incrementLock = 1; //used to lock the increment counters, to avoid race conditions.
 
