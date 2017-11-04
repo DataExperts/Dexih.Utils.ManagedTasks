@@ -14,23 +14,29 @@ namespace dexih.utils.ManagedTasks
         public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTasksCompleted;
 
-        public long CreatedCount { get; set; }
-        public long ScheduledCount { get; set; }
-        public long QueuedCount { get; set; }
-        public long RunningCount { get; set; }
-        public long CompletedCount { get; set; }
-        public long ErrorCount { get; set; }
-        public long CancelCount { get; set; }
-
-        public object _incrementLock = 1; //used to lock the increment counters, to avoid race conditions.
+        private long _createdCount;
+        private long _scheduledCount;
+        private long _queuedCount;
+        private long _runningCount;
+        private long _completedCount;
+        private long _errorCount;
+        private long _cancelCount;
+		
+        public long CreatedCount => _createdCount;
+        public long ScheduledCount => _scheduledCount;
+        public long QueuedCount => _queuedCount;
+        public long RunningCount => _runningCount;
+        public long CompletedCount => _completedCount;
+        public long ErrorCount => _errorCount;
+        public long CancelCount  => _cancelCount;
 
         private readonly ConcurrentDictionary<string, ManagedTask> _runningTasks;
         private readonly ConcurrentQueue<ManagedTask> _queuedTasks;
 
         private readonly ConcurrentDictionary<string, ManagedTask> _taskChangeHistory;
 
-        private AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
-        private object _updateTasksLock = 1; // used to lock when updaging task queues.
+        private readonly AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
+        private readonly object _updateTasksLock = 1; // used to lock when updaging task queues.
         private Exception _exitException; //used to push exceptions to the WhenAny function.
 
         public ManagedTaskHandler(int maxConcurrent = 100)
@@ -77,34 +83,30 @@ namespace dexih.utils.ManagedTasks
                 //store most recent update
                 _taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask );
 
-                lock (_incrementLock)
+                switch (newStatus)
                 {
-                    switch (newStatus)
-                    {
-                        case EManagedTaskStatus.Created:
-                            CreatedCount++;
-                            break;
-                        case EManagedTaskStatus.Scheduled:
-                            ScheduledCount++;
-                            break;
-                        case EManagedTaskStatus.Queued:
-                            QueuedCount++;
-                            break;
-                        case EManagedTaskStatus.Running:
-                            RunningCount++;
-                            break;
-                        case EManagedTaskStatus.Completed:
-                            CompletedCount++;
-                            break;
-                        case EManagedTaskStatus.Error:
-                            ErrorCount++;
-                            break;
-                        case EManagedTaskStatus.Cancelled:
-                            CancelCount++;
-                            break;
-                    }
+                    case EManagedTaskStatus.Created:
+                        Interlocked.Increment(ref _createdCount);
+                        break;
+                    case EManagedTaskStatus.Scheduled:
+                        Interlocked.Increment(ref _scheduledCount);
+                        break;
+                    case EManagedTaskStatus.Queued:
+                        Interlocked.Increment(ref _queuedCount);
+                        break;
+                    case EManagedTaskStatus.Running:
+                        Interlocked.Increment(ref _runningCount);
+                        break;
+                    case EManagedTaskStatus.Completed:
+                        Interlocked.Increment(ref _completedCount);
+                        break;
+                    case EManagedTaskStatus.Error:
+                        Interlocked.Increment(ref _errorCount);
+                        break;
+                    case EManagedTaskStatus.Cancelled:
+                        Interlocked.Increment(ref _cancelCount);
+                        break;
                 }
-
                 // if the status is finished (eg completed, cancelled, error) when remove the task and look for new tasks.
                 if(newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled || newStatus == EManagedTaskStatus.Error)
                 {
