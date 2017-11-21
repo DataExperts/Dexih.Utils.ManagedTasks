@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace dexih.utils.ManagedTasks
 {
 	/// <summary>
-	/// Simple collection of managed tasks
+	/// Collection of managed tasks.
 	/// </summary>
 	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable
 	{
@@ -38,34 +38,25 @@ namespace dexih.utils.ManagedTasks
 		private readonly ConcurrentDictionary<(string category, long categoryKey), ManagedTask> _completedTasks;
 
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
-		private readonly TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
+		private TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
         private int _resetRunningCount;
 
 		public ManagedTaskHandler TaskHandler { get; private set; }
 
 		public ManagedTasks(ManagedTaskHandler taskHandler = null)
 		{
-			if (taskHandler == null)
-			{
-				TaskHandler = new ManagedTaskHandler();
-			}
-			else
-			{
-				TaskHandler = taskHandler;
-			}
-
+			TaskHandler = taskHandler ?? new ManagedTaskHandler();
 			TaskHandler.OnStatus += StatusChange;
 			TaskHandler.OnProgress += ProgressChange;
 
 			_activeTasks = new ConcurrentDictionary<string, ManagedTask>();
 			_activeCategoryTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
 			_completedTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
-			_noMoreTasks = new TaskCompletionSource<bool>(false);
+            _noMoreTasks = new TaskCompletionSource<bool>(false);
 		}
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
-
 			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CatagoryKey >= 0 && _activeCategoryTasks.ContainsKey((managedTask.Category, managedTask.CatagoryKey)))
 			{
 				throw new ManagedTaskException(managedTask, $"The {managedTask.Category} - {managedTask.Name} with key {managedTask.CatagoryKey} is alredy active and cannot be run at the same time.");
@@ -83,6 +74,7 @@ namespace dexih.utils.ManagedTasks
 			}
 			else
 			{
+				managedTask.OnSchedule += Schedule;
 				managedTask.OnTrigger += Trigger;
 
 				if (!managedTask.Schedule())
@@ -171,6 +163,11 @@ namespace dexih.utils.ManagedTasks
 			var managedTask = (ManagedTask)sender;
 			TaskHandler.Add(managedTask);
 		}
+		
+		private void Schedule(object sender, EventArgs e)
+		{
+			StatusChange(sender, EManagedTaskStatus.Scheduled);
+		}
 
 		private void StatusChange(object sender, EManagedTaskStatus newStatus)
 		{
@@ -215,7 +212,7 @@ namespace dexih.utils.ManagedTasks
 			catch (Exception ex)
 			{
 				_exitException = ex;
-				_noMoreTasks.SetException(_exitException);
+				_noMoreTasks.TrySetException(_exitException);
 			}
 		}
 
@@ -223,10 +220,11 @@ namespace dexih.utils.ManagedTasks
         {
           	Interlocked.Increment(ref _resetRunningCount);
 
+	        managedTask.OnSchedule += Schedule;
             if (managedTask.Schedule())
             {
-                managedTask.OnTrigger += Trigger;
                 managedTask.Reset();
+                managedTask.OnTrigger += Trigger;
             }
             else
             {
@@ -238,7 +236,7 @@ namespace dexih.utils.ManagedTasks
                 if (!_activeTasks.TryRemove(managedTask.Reference, out var activeTask))
                 {
                     _exitException = new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
-	                _noMoreTasks.SetException(_exitException);
+	                _noMoreTasks.TrySetException(_exitException);
                 }
 
                 _completedTasks.AddOrUpdate((activeTask.Category, activeTask.CatagoryKey), activeTask, (oldKey, oldValue) => activeTask);
@@ -279,7 +277,7 @@ namespace dexih.utils.ManagedTasks
 
 			if (_activeTasks.Count == 0 && _resetRunningCount == 0)
 			{
-				_noMoreTasks.SetResult(true);
+				_noMoreTasks.TrySetResult(true);
 			}
 		}
 
@@ -293,7 +291,6 @@ namespace dexih.utils.ManagedTasks
 			var cancellationToken = CancellationToken.None;
 			return WhenAll(cancellationToken);
 		}
-
 
 		public async Task WhenAll(CancellationToken cancellationToken)
 		{
@@ -314,6 +311,7 @@ namespace dexih.utils.ManagedTasks
                 }
 
 				resetValue = _noMoreTasks.Task.Result;
+                _noMoreTasks = new TaskCompletionSource<bool>(false);
 			}
 		}
 
@@ -363,7 +361,6 @@ namespace dexih.utils.ManagedTasks
 
         public void Dispose()
         {
-            TaskHandler.WhenAll().Wait();
             TaskHandler.Dispose();
             OnProgress = null;
             OnStatus = null;

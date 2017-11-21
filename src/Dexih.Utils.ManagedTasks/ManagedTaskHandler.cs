@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace dexih.utils.ManagedTasks
 {
+    /// <summary>
+    /// Creates a queue of tasks, and sequentially executes those tasks using the maxConcurrent 
+    /// as the number of tasks to execute in parallel.
+    /// </summary>
     public class ManagedTaskHandler : IDisposable
     {
         private readonly int _maxConcurrent;
@@ -35,8 +39,8 @@ namespace dexih.utils.ManagedTasks
 
         private readonly ConcurrentDictionary<string, ManagedTask> _taskChangeHistory;
 
-        private readonly AutoResetEvent _resetWhenNoTasks; //event handler that triggers when all tasks completed.
-        private readonly object _updateTasksLock = 1; // used to lock when updaging task queues.
+        private TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
+        
         private Exception _exitException; //used to push exceptions to the WhenAny function.
 
         public ManagedTaskHandler(int maxConcurrent = 100)
@@ -45,36 +49,33 @@ namespace dexih.utils.ManagedTasks
 
             _runningTasks = new ConcurrentDictionary<string, ManagedTask>();
             _queuedTasks = new ConcurrentQueue<ManagedTask>();
-            _resetWhenNoTasks = new AutoResetEvent(false);
+            _noMoreTasks = new TaskCompletionSource<bool>(false);
             _taskChangeHistory = new ConcurrentDictionary<string, ManagedTask>();
         }
 
         public ManagedTask Add(ManagedTask managedTask)
         {
-            lock (_updateTasksLock)
+            if (_runningTasks.Count < _maxConcurrent)
             {
-                if (_runningTasks.Count < _maxConcurrent)
+                var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
+                if(!tryaddTask)
                 {
-                    var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
-                    if(!tryaddTask)
-                    {
-                        throw new ManagedTaskException(managedTask, "Failed to add the managed task to the running tasks queue.");
-                    }
+                    throw new ManagedTaskException(managedTask, "Failed to add the managed task to the running tasks queue.");
+                }
 
-                    managedTask.OnStatus += StatusChange;
-                    managedTask.OnProgress += ProgressChanged;
-                    managedTask.Start();
-                }
-                else
-                {
-                    _queuedTasks.Enqueue(managedTask);
-                }
+                managedTask.OnStatus += StatusChange;
+                managedTask.OnProgress += ProgressChanged;
+                managedTask.Start();
+            }
+            else
+            {
+                _queuedTasks.Enqueue(managedTask);
             }
 
             return managedTask;
         }
 
-        public void StatusChange(object sender, EManagedTaskStatus newStatus)
+        private void StatusChange(object sender, EManagedTaskStatus newStatus)
         {
             try
             {
@@ -118,11 +119,11 @@ namespace dexih.utils.ManagedTasks
             catch (Exception ex)
             {
                 _exitException = ex;
-                _resetWhenNoTasks.Set();
+                _noMoreTasks.TrySetException(ex);
             }
         }
 
-        public void ProgressChanged(object sender, ManagedTaskProgressItem progress)
+        private void ProgressChanged(object sender, ManagedTaskProgressItem progress)
         {
             var managedTask = (ManagedTask)sender;
 
@@ -134,24 +135,21 @@ namespace dexih.utils.ManagedTasks
 
         private void ResetCompletedTask(ManagedTask managedTask)
         {
-            lock (_updateTasksLock)
+            if (!_runningTasks.TryRemove(managedTask.Reference, out var finishedTask))
             {
-                if (!_runningTasks.TryRemove(managedTask.Reference, out var finishedTask))
-                {
-                    _exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
-                    _resetWhenNoTasks.Set();
-                    return;
-                }
-                finishedTask.Dispose();
+                _exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
+                _noMoreTasks.TrySetException(_exitException);
+                return;
+            }
+            finishedTask.Dispose();
 
-                UpdateRunningQueue();
+            UpdateRunningQueue();
 
-                // if there are no remainning tasks, set the trigger to allow WhenAll to run.
-                if (_runningTasks.Count == 0 && _queuedTasks.Count == 0)
-                {
-                    OnTasksCompleted?.Invoke(this, EventArgs.Empty);
-                    _resetWhenNoTasks.Set();
-                }
+            // if there are no remainning tasks, set the trigger to allow WhenAll to run.
+            if (_runningTasks.Count == 0 && _queuedTasks.Count == 0)
+            {
+                OnTasksCompleted?.Invoke(this, EventArgs.Empty);
+                _noMoreTasks.TrySetResult(true);
             }
         }
 
@@ -164,7 +162,7 @@ namespace dexih.utils.ManagedTasks
                 {
                     // something wrong with concurrency if this is hit.
                     _exitException = new ManagedTaskException(queuedTask, "Failed to remove the task from the queued tasks list.");
-                    _resetWhenNoTasks.Set();
+                    _noMoreTasks.TrySetException(_exitException);
                     return;
                 }
 
@@ -179,7 +177,7 @@ namespace dexih.utils.ManagedTasks
                 {
                     // something wrong with concurrency if this is hit.
                     _exitException = new ManagedTaskException(queuedTask, "Failed to add the task from the running tasks list.");
-                    _resetWhenNoTasks.Set();
+                    _noMoreTasks.TrySetException(_exitException);
                     return;
                 }
 
@@ -189,15 +187,25 @@ namespace dexih.utils.ManagedTasks
             }
         }
 
-        public async Task WhenAll()
+        public async Task WhenAll(CancellationToken cancellationToken)
         {
-            if (_runningTasks.Count > 0 || _queuedTasks.Count > 0)
+            var resetValue = false;
+            
+            while (!resetValue || (_runningTasks.Count > 0 && _queuedTasks.Count > 0))
             {
-                await Task.Run(() => _resetWhenNoTasks.WaitOne());
+                await Task.WhenAny(_noMoreTasks.Task, Task.Delay(-1, cancellationToken));
                 if (_exitException != null)
                 {
                     throw _exitException;
                 }
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw new TaskCanceledException();
+                }
+
+                resetValue = _noMoreTasks.Task.Result;
+                _noMoreTasks = new TaskCompletionSource<bool>(false);
             }
         }
 
@@ -214,13 +222,24 @@ namespace dexih.utils.ManagedTasks
             return _taskChangeHistory.Count;
         }
 
-        public void ResetTaskChanges()
+        private void ResetTaskChanges()
         {
             _taskChangeHistory.Clear();
         }
 
         public void Dispose()
         {
+            foreach (var task in _queuedTasks)
+            {
+                task.Cancel();
+                task.Dispose();
+            }
+            foreach (var task in _runningTasks)
+            {
+                task.Value.Cancel();
+                task.Value.Dispose();
+            }
+            
             OnStatus = null;
             OnProgress = null;
             OnTasksCompleted = null;

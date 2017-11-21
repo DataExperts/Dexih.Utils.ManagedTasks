@@ -19,6 +19,7 @@ namespace dexih.utils.ManagedTasks
         public event EventHandler<EManagedTaskStatus> OnStatus;
         public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTrigger;
+        public event EventHandler OnSchedule;
 
         public bool Success { get; set; }
         public string Message { get; set; }
@@ -183,11 +184,15 @@ namespace dexih.utils.ManagedTasks
 
                 if(startAt != null)
                 {
+                    SetStatus(EManagedTaskStatus.Scheduled);
+                    OnSchedule?.Invoke(this, EventArgs.Empty);
+                    
                     var timeToGo = startAt.Value - DateTime.Now;
 
                     if (timeToGo > TimeSpan.Zero)
                     {
                         NextTriggerTime = startAt;
+                        
                         //add a schedule.
                         _timer = new Timer(x => TriggerReady(startTrigger), null, timeToGo, Timeout.InfiniteTimeSpan);
                         allowSchedule = true;
@@ -202,7 +207,7 @@ namespace dexih.utils.ManagedTasks
             return allowSchedule;
         }
 
-        public void TriggerReady(ManagedTaskSchedule trigger)
+        private void TriggerReady(ManagedTaskSchedule trigger)
         {
             OnTrigger?.Invoke(this, EventArgs.Empty);
         }
@@ -320,7 +325,7 @@ namespace dexih.utils.ManagedTasks
             OnProgress = null;
             OnStatus = null;
             OnTrigger = null;
-           // _cancellationTokenSource.Dispose();
+            OnSchedule = null;
         }
 
         private string _exceptionDetails;

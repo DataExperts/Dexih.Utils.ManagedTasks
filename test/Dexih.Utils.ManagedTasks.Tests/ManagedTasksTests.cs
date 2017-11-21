@@ -65,7 +65,7 @@ namespace dexih.functions.tests
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
-            await handler.WhenAll();
+            await handler.WhenAll(cts.Token);
 
             Assert.Equal(taskCount, handler.CompletedCount);
         }
@@ -421,7 +421,7 @@ namespace dexih.functions.tests
         public async Task Test_ManagedTask_Schedule_Recurring()
         {
             var managedTasks = new ManagedTasks();
-
+            
             var startTime = DateTime.Now.TimeOfDay;
 
             // simple task that takes 1 second to run
@@ -430,6 +430,18 @@ namespace dexih.functions.tests
                 _output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime));
                 await Task.Delay(1000, cancellationToken);
             }
+            
+            var scheduleCount = 0;
+            
+            void OnSchedule(object sender, EManagedTaskStatus status)
+            {
+                if (status == EManagedTaskStatus.Scheduled)
+                {
+                    Interlocked.Increment(ref scheduleCount);
+                }
+            }
+
+            managedTasks.OnStatus += OnSchedule;
 
             // starts in 1 second, then runs 1 second job
             var trigger = new ManagedTaskSchedule()
@@ -440,16 +452,21 @@ namespace dexih.functions.tests
                 MaxRecurrs = 5
             };
 
-            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger }, null);
+            managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger }, null);
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
             await managedTasks.WhenAll(cts.Token);
 
+            Assert.Equal(5, scheduleCount);
+
+            Assert.Equal(5, managedTasks.ScheduledCount);
             Assert.Equal(5, managedTasks.CompletedCount);
 
             // 10 seconds = Initial 1 + 2 *(5-1) recurrs + 1 final job
             Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
         }
+        
+
     }
 }
