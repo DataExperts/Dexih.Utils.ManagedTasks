@@ -36,6 +36,7 @@ namespace dexih.utils.ManagedTasks
 
         private readonly ConcurrentDictionary<string, ManagedTask> _runningTasks;
         private readonly ConcurrentQueue<ManagedTask> _queuedTasks;
+        private readonly ConcurrentQueue<ManagedTask> _scheduledTasks;
 
         private readonly ConcurrentDictionary<string, ManagedTask> _taskChangeHistory;
 
@@ -43,36 +44,57 @@ namespace dexih.utils.ManagedTasks
         
         private Exception _exitException; //used to push exceptions to the WhenAny function.
 
+        private object _taskAddLock = 1;
+
         public ManagedTaskHandler(int maxConcurrent = 100)
         {
             _maxConcurrent = maxConcurrent;
 
             _runningTasks = new ConcurrentDictionary<string, ManagedTask>();
             _queuedTasks = new ConcurrentQueue<ManagedTask>();
+            _scheduledTasks = new ConcurrentQueue<ManagedTask>();
             _noMoreTasks = new TaskCompletionSource<bool>(false);
             _taskChangeHistory = new ConcurrentDictionary<string, ManagedTask>();
         }
 
         public ManagedTask Add(ManagedTask managedTask)
         {
-            if (_runningTasks.Count < _maxConcurrent)
+            lock (_taskAddLock) // lock to ensure _runningTask.Count is consistent when adding the task
             {
-                var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
-                if(!tryaddTask)
+                if (_runningTasks.Count < _maxConcurrent)
                 {
-                    throw new ManagedTaskException(managedTask, "Failed to add the managed task to the running tasks queue.");
-                }
+                    var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
+                    if (!tryaddTask)
+                    {
+                        throw new ManagedTaskException(managedTask,
+                            "Failed to add the managed task to the running tasks queue.");
+                    }
 
-                managedTask.OnStatus += StatusChange;
-                managedTask.OnProgress += ProgressChanged;
-                managedTask.Start();
-            }
-            else
-            {
-                _queuedTasks.Enqueue(managedTask);
+                    managedTask.OnStatus += StatusChange;
+                    managedTask.OnProgress += ProgressChanged;
+                    managedTask.Start();
+                }
+                else
+                {
+                    _queuedTasks.Enqueue(managedTask);
+                }
             }
 
             return managedTask;
+        }
+
+        public void AddScheduled(ManagedTask managedTask)
+        {
+            managedTask.OnTrigger += Trigger;
+            if (managedTask.CheckPreviousTrigger())
+            {
+                Add(managedTask);
+            }
+            else
+            {
+                StatusChange(managedTask, EManagedTaskStatus.Scheduled);
+                _scheduledTasks.Enqueue(managedTask);
+            }
         }
 
         private void StatusChange(object sender, EManagedTaskStatus newStatus)
@@ -143,48 +165,54 @@ namespace dexih.utils.ManagedTasks
             }
             finishedTask.Dispose();
 
-            UpdateRunningQueue();
-
-            // if there are no remainning tasks, set the trigger to allow WhenAll to run.
-            if (_runningTasks.Count == 0 && _queuedTasks.Count == 0)
+            lock (_taskAddLock)
             {
-                OnTasksCompleted?.Invoke(this, EventArgs.Empty);
-                _noMoreTasks.TrySetResult(true);
+                // update the running queue
+                while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
+                {
+                    if (!_queuedTasks.TryDequeue(out var queuedTask))
+                    {
+                        // something wrong with concurrency if this is hit.
+                        _exitException = new ManagedTaskException(queuedTask,
+                            "Failed to remove the task from the queued tasks list.");
+                        _noMoreTasks.TrySetException(_exitException);
+                        return;
+                    }
+
+                    // if the task is marked as cancelled just ignore it
+                    if (queuedTask.Status == EManagedTaskStatus.Cancelled)
+                    {
+                        OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
+                        continue;
+                    }
+
+                    if (!_runningTasks.TryAdd(queuedTask.Reference, queuedTask))
+                    {
+                        // something wrong with concurrency if this is hit.
+                        _exitException = new ManagedTaskException(queuedTask,
+                            "Failed to add the task from the running tasks list.");
+                        _noMoreTasks.TrySetException(_exitException);
+                        return;
+                    }
+
+                    queuedTask.OnStatus += StatusChange;
+                    queuedTask.OnProgress += ProgressChanged;
+                    queuedTask.Start();
+                }
+
+                // if there are no remainning tasks, set the trigger to allow WhenAll to run.
+                if (_runningTasks.Count == 0 && _queuedTasks.Count == 0)
+                {
+                    OnTasksCompleted?.Invoke(this, EventArgs.Empty);
+                    _noMoreTasks.TrySetResult(true);
+                }
             }
         }
 
-        private void UpdateRunningQueue()
+       private void Trigger(object sender, EventArgs e)
         {
-            // update the running queue
-            while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
-            {
-                if (!_queuedTasks.TryDequeue(out var queuedTask))
-                {
-                    // something wrong with concurrency if this is hit.
-                    _exitException = new ManagedTaskException(queuedTask, "Failed to remove the task from the queued tasks list.");
-                    _noMoreTasks.TrySetException(_exitException);
-                    return;
-                }
-
-                // if the task is marked as cancelled just ignore it
-                if (queuedTask.Status == EManagedTaskStatus.Cancelled)
-                {
-                    OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
-                    continue;
-                }
-
-                if (!_runningTasks.TryAdd(queuedTask.Reference, queuedTask))
-                {
-                    // something wrong with concurrency if this is hit.
-                    _exitException = new ManagedTaskException(queuedTask, "Failed to add the task from the running tasks list.");
-                    _noMoreTasks.TrySetException(_exitException);
-                    return;
-                }
-
-                queuedTask.OnStatus += StatusChange;
-                queuedTask.OnProgress += ProgressChanged;
-                queuedTask.Start();
-            }
+            var managedTask = (ManagedTask)sender;
+            Add(managedTask);
         }
 
         public async Task WhenAll(CancellationToken cancellationToken)

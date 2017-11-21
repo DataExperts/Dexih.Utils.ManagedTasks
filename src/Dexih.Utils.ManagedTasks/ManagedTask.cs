@@ -62,7 +62,7 @@ namespace dexih.utils.ManagedTasks
 
         public int Percentage { get; set; }
         public string StepName { get; set; }
-
+        
         public bool IsCompleted 
         { 
             get
@@ -104,6 +104,7 @@ namespace dexih.utils.ManagedTasks
         private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
         private bool _anotherProgressInvoke;
+        private bool _previousTrigger;
 
         private Timer _timer;
 
@@ -209,7 +210,21 @@ namespace dexih.utils.ManagedTasks
 
         private void TriggerReady(ManagedTaskSchedule trigger)
         {
-            OnTrigger?.Invoke(this, EventArgs.Empty);
+            if (OnTrigger == null)
+            {
+                _previousTrigger = true;
+            }
+            else
+            {
+                OnTrigger?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public bool CheckPreviousTrigger()
+        {
+            var value = _previousTrigger;
+            _previousTrigger = false;
+            return value;
         }
 
         public void Queue()

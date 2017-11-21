@@ -74,9 +74,6 @@ namespace dexih.utils.ManagedTasks
 			}
 			else
 			{
-				managedTask.OnSchedule += Schedule;
-				managedTask.OnTrigger += Trigger;
-
 				if (!managedTask.Schedule())
 				{
 					if (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0)
@@ -84,6 +81,8 @@ namespace dexih.utils.ManagedTasks
 						throw new ManagedTaskException(managedTask, "The task could not be started as none of the triggers returned a future schedule time.");
 					}
 				}
+				
+				TaskHandler.AddScheduled(managedTask);
 			}
 
 			return managedTask;
@@ -158,17 +157,6 @@ namespace dexih.utils.ManagedTasks
 			return Add(managedTask);
 		}
 
-		private void Trigger(object sender, EventArgs e)
-		{
-			var managedTask = (ManagedTask)sender;
-			TaskHandler.Add(managedTask);
-		}
-		
-		private void Schedule(object sender, EventArgs e)
-		{
-			StatusChange(sender, EManagedTaskStatus.Scheduled);
-		}
-
 		private void StatusChange(object sender, EManagedTaskStatus newStatus)
 		{
 			try
@@ -220,11 +208,10 @@ namespace dexih.utils.ManagedTasks
         {
           	Interlocked.Increment(ref _resetRunningCount);
 
-	        managedTask.OnSchedule += Schedule;
             if (managedTask.Schedule())
             {
                 managedTask.Reset();
-                managedTask.OnTrigger += Trigger;
+	            TaskHandler.AddScheduled(managedTask);
             }
             else
             {
