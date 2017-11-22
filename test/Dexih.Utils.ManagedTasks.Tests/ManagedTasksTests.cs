@@ -1,5 +1,8 @@
 ﻿using dexih.utils.ManagedTasks;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +16,7 @@ namespace dexih.functions.tests
         private readonly ITestOutputHelper _output;
 
         int _progressCounter = 0;
+        
 
         public DexihFunctionsManagedTasks(ITestOutputHelper output)
         {
@@ -28,22 +32,13 @@ namespace dexih.functions.tests
             _output.WriteLine($"Completed tasks count: {managedTasks.CompletedCount }");
             _output.WriteLine($"Cancel tasks count: {managedTasks.CancelCount }");
             _output.WriteLine($"Error tasks count: {managedTasks.ErrorCount }");
-
-            _output.WriteLine($"Create handler tasks count: {managedTasks.TaskHandler.CreatedCount }");
-            _output.WriteLine($"Queued handler tasks count: {managedTasks.TaskHandler.QueuedCount }");
-            _output.WriteLine($"Running handler tasks count: {managedTasks.TaskHandler.RunningCount }");
-            _output.WriteLine($"Scheduled handler tasks count: {managedTasks.TaskHandler.ScheduledCount }");
-            _output.WriteLine($"Completed handler tasks count: {managedTasks.TaskHandler.CompletedCount }");
-            _output.WriteLine($"Cancel handler tasks count: {managedTasks.TaskHandler.CancelCount }");
-            _output.WriteLine($"Error handler tasks count: {managedTasks.TaskHandler.ErrorCount }");
-
         }
 
         [Theory]
         [InlineData(2000)]
         public async Task ParalleManagedTaskHandlerConcurrent(int taskCount)
         {
-            var handler = new ManagedTaskHandler();
+            var handler = new ManagedTasks();
 
             async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
@@ -60,7 +55,7 @@ namespace dexih.functions.tests
                     Category = "123",
                     Action = Action
                 };
-                var task1 = handler.Add(task);
+                handler.Add(task);
             }
 
             var cts = new CancellationTokenSource();
@@ -87,7 +82,7 @@ namespace dexih.functions.tests
 
             _progressCounter = 0;
             managedTasks.OnProgress += Progress;
-            var task1 = managedTasks.Add("123", "task", "test", "object", Action, null, null);
+            var task1 = managedTasks.Add("123", "task", "test", "object", Action, null);
 
             //check properties are set correctly.
             Assert.Equal("123", task1.OriginatorId);
@@ -129,12 +124,12 @@ namespace dexih.functions.tests
                 }
             }
 
-            var task1 = managedTasks.Add("123", "task", "test","category", 1, 1, "object", Action, null, null);
+            var task1 = managedTasks.Add("123", "task", "test","category", 1, 1, "object", Action, null, null, null);
 
             //adding the same task when runnning should result in error.
             Assert.Throws(typeof(ManagedTaskException), () =>
             {
-                var task2 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null);
+                var task2 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null, null);
             });
 
             var cts = new CancellationTokenSource();
@@ -142,7 +137,7 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
 
             // add the same task again now the previous one has finished.
-            var task3 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null);
+            var task3 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null, null);
 
             Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
         }
@@ -154,8 +149,6 @@ namespace dexih.functions.tests
         [InlineData(500)]
         public async Task Test_MultipleManagedTasks(int taskCount)
         {
-            var handler = new ManagedTaskHandler();
-
             var completedCounter = 0;
             var runningCounter = 0;
 
@@ -178,7 +171,7 @@ namespace dexih.functions.tests
                 }
             }
             
-            var managedTasks = new ManagedTasks(handler);
+            var managedTasks = new ManagedTasks();
             managedTasks.OnStatus += CompletedCounter;
 
             // simple task reports progress 10 times.
@@ -212,15 +205,13 @@ namespace dexih.functions.tests
             Assert.Equal(0, managedTasks.Count());
 
             // check the changes history
-            var changes = handler.GetTaskChanges();
+            var changes = managedTasks.GetTaskChanges().ToArray();
             Assert.Equal(taskCount, changes.Count());
             foreach(var change in changes)
             {
                 Assert.Equal(EManagedTaskStatus.Completed, change.Status);
             }
         }
-
-
 
         int _errorCount = 0;
         [Theory]
@@ -245,7 +236,7 @@ namespace dexih.functions.tests
 
                 for (var i = 0; i < taskCount; i++)
                 {
-                    managedTasks.Add("123", "task3", "test", null, Action, null, null);
+                    managedTasks.Add("123", "task3", "test", null, Action, null);
                 }
 
                 var cts = new CancellationTokenSource();
@@ -257,7 +248,6 @@ namespace dexih.functions.tests
                 Assert.Equal(taskCount, startedTaskCount);
 
                 // all error counters should eqaul the number of tasks
-                Assert.Equal(taskCount, managedTasks.TaskHandler.ErrorCount);
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
                 Assert.Equal(taskCount, _errorCount);
                 Assert.Equal(0, managedTasks.Count());
@@ -301,7 +291,7 @@ namespace dexih.functions.tests
             var tasks = new ManagedTask[100];
             for (var i = 0; i < 100; i++)
             {
-                tasks[i] = managedTasks.Add("123", "task3", "test", null, Action, null, null);
+                tasks[i] = managedTasks.Add("123", "task3", "test", null, Action, null);
             }
 
             for (var i = 0; i < 100; i++)
@@ -346,7 +336,7 @@ namespace dexih.functions.tests
             var startDate = DateTime.Now;
 
             // run task1, then task2, then task 3 
-            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null, null);
+            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
             var task2 = managedTasks.Add("123", "task2", "test", null, Action, null, new[] { task1.Reference });
             var task3 = managedTasks.Add("123", "task3", "test", null, Action, null, new[] { task2.Reference });
 
@@ -372,8 +362,8 @@ namespace dexih.functions.tests
             var startDate = DateTime.Now;
 
             // run task1 & task2 parallel, then task 3 when both finish
-            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null, null);
-            var task2 = managedTasks.Add("123", "task2", "test", null, Action, null, null);
+            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
+            var task2 = managedTasks.Add("123", "task2", "test", null, Action, null);
             var task3 = managedTasks.Add("123", "task3", "test", null, Action, null, new[] { task1.Reference, task2.Reference });
 
             var cts = new CancellationTokenSource();
@@ -402,12 +392,13 @@ namespace dexih.functions.tests
             var trigger = new ManagedTaskSchedule()
             {
                 StartDate = currentDate,
-                StartTime = currentDate.AddSeconds(5).TimeOfDay
+                StartTime = currentDate.AddSeconds(5).TimeOfDay,
+                IntervalType = ManagedTaskSchedule.EIntervalType.Once
             };
             
             _output.WriteLine($"Time to Start: {trigger.NextOcurrance(DateTime.Now)-DateTime.Now}");
 
-            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger }, null);
+            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -452,7 +443,7 @@ namespace dexih.functions.tests
                 MaxRecurrs = 5
             };
 
-            managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger }, null);
+            managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -466,7 +457,72 @@ namespace dexih.functions.tests
             // 10 seconds = Initial 1 + 2 *(5-1) recurrs + 1 final job
             Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
         }
-        
+
+        [Fact]
+        public async Task Test_ManagedTask_FileWatcher()
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "TestFiles");
+
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+            
+            var managedTasks = new ManagedTasks();
+            var startTime = DateTime.Now;
+           
+            // simple task that deletes the file that was being watched.
+            Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            {
+                _output.WriteLine("task started - " + DateTime.Now);
+                var files = Directory.GetFiles(path);
+                foreach (var file in files)
+                {
+                    _output.WriteLine("delete file - " +file);
+                    File.Delete(file);
+                }
+                return Task.CompletedTask;
+            }
+            
+            var fileWatchCount = 0;
+            
+            void OnFileWatch(object sender, EManagedTaskStatus status)
+            {
+                if (status == EManagedTaskStatus.FileWatching)
+                {
+                    Interlocked.Increment(ref fileWatchCount);
+                }
+            }
+            
+            
+            managedTasks.OnStatus += OnFileWatch;
+            
+            var fileWatch = new ManagedTaskFileWatcher(path, "*");
+
+            
+            var fileTask = managedTasks.Add("123", "task3", "test", null, Action, null,  new[] { fileWatch });
+
+            for (var i = 0; i < 5; i++)
+            {
+                File.Create(Path.Combine(path, "test-" + Guid.NewGuid()));
+                await Task.Delay(1000);
+            }
+            
+            fileTask.Cancel();
+            
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(10000);
+            await managedTasks.WhenAll(cts.Token);
+
+            // filewatch count will be 6.  One for each file (5), and then another for the next watcher that was started before the cancel.
+            Assert.Equal(6, fileWatchCount);
+
+            Assert.Equal(6, managedTasks.FileWatchCount);
+            Assert.Equal(5, managedTasks.CompletedCount);
+
+            // should 5 seconds (with tollernace)
+            Assert.True(startTime.AddSeconds(5) < DateTime.Now && startTime.AddSeconds(5.5) > DateTime.Now);
+        }
 
     }
 }

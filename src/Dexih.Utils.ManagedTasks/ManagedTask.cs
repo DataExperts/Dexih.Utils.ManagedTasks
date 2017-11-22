@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace dexih.utils.ManagedTasks
     [JsonConverter(typeof(StringEnumConverter))]
     public enum EManagedTaskStatus
     {
-        Created, Scheduled, Queued, Running, Cancelled, Error, Completed
+        Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
     }
     
     public class ManagedTask: IDisposable
@@ -20,6 +21,7 @@ namespace dexih.utils.ManagedTasks
         public event EventHandler<ManagedTaskProgressItem> OnProgress;
         public event EventHandler OnTrigger;
         public event EventHandler OnSchedule;
+        public event EventHandler OnFileWatch;
 
         public bool Success { get; set; }
         public string Message { get; set; }
@@ -63,15 +65,11 @@ namespace dexih.utils.ManagedTasks
         public int Percentage { get; set; }
         public string StepName { get; set; }
         
-        public bool IsCompleted 
-        { 
-            get
-            {
-                return Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
-            }
-        }
+        public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
 
         public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
+        
+        public IEnumerable<ManagedTaskFileWatcher> FileWatchers { get; set; }
 
         public DateTime? NextTriggerTime { get; protected set; }
 
@@ -98,26 +96,22 @@ namespace dexih.utils.ManagedTasks
         [JsonIgnore]
         public Func<ManagedTaskProgress, CancellationToken, Task> Action { get; set; }
 
-        private CancellationTokenSource _cancellationTokenSource;
+        private readonly CancellationTokenSource _cancellationTokenSource;
         
         private Task _task;
         private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
         private bool _anotherProgressInvoke;
         private bool _previousTrigger;
+        
+        private HashSet<string> _filesProcessed;
+
 
         private Timer _timer;
+        private List<FileSystemWatcher> _fileSystemWatchers;
+        private readonly object _triggerLock = 1;
 
         // private Task _eventManager;
-
-        private void SetStatus(EManagedTaskStatus newStatus)
-        {
-            if(newStatus > Status)
-            {
-                Status = newStatus;
-                OnStatus?.Invoke(this, Status);
-            }
-        }
 
         public ManagedTask()
         {
@@ -156,18 +150,50 @@ namespace dexih.utils.ManagedTasks
             });
         }
 
+        private void SetStatus(EManagedTaskStatus newStatus)
+        {
+            if (newStatus != Status)
+            {
+                OnStatus?.Invoke(this, newStatus);
+            }
+        }
+        
         /// <summary>
         /// Start task schedule based on the "Triggers".
         /// </summary>
         public bool Schedule()
         {
-            if(Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled)
+           
+            if(Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
             {
                 throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status);
             }
 
             var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DepedenciesMet && RunCount == 0;
 
+            // if the filewatchers are no set, then set them.
+            if (FileWatchers != null && FileWatchers.Any())
+            {
+                if (_fileSystemWatchers == null)
+                {
+                    _fileSystemWatchers = new List<FileSystemWatcher>();
+                    _filesProcessed = new HashSet<string>();
+                
+                    foreach (var fileWatcher in FileWatchers)
+                    {
+                        var fileSystemWatcher = new FileSystemWatcher(fileWatcher.Path);
+                        fileSystemWatcher.EnableRaisingEvents = true;
+                        fileSystemWatcher.Created += FileReady;
+                        fileSystemWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
+                        _fileSystemWatchers.Add(fileSystemWatcher);
+                    }
+                }
+                
+                SetStatus(EManagedTaskStatus.FileWatching);
+                OnFileWatch?.Invoke(this, EventArgs.Empty);
+                allowSchedule = true;
+            }
+            
             if (Triggers != null)
             {
                 // loop through the triggers to find the one scheduled the soonest.
@@ -185,6 +211,8 @@ namespace dexih.utils.ManagedTasks
 
                 if(startAt != null)
                 {
+                    allowSchedule = true;
+
                     SetStatus(EManagedTaskStatus.Scheduled);
                     OnSchedule?.Invoke(this, EventArgs.Empty);
                     
@@ -196,7 +224,6 @@ namespace dexih.utils.ManagedTasks
                         
                         //add a schedule.
                         _timer = new Timer(x => TriggerReady(startTrigger), null, timeToGo, Timeout.InfiniteTimeSpan);
-                        allowSchedule = true;
                     }
                     else
                     {
@@ -208,17 +235,123 @@ namespace dexih.utils.ManagedTasks
             return allowSchedule;
         }
 
+
+        /// <summary>
+        /// Stops the schedule, and file watchers.
+        /// </summary>
+        public void DisposeSchedules()
+        {
+            // close all the existing triggers.
+            _timer?.Dispose();
+            if (_fileSystemWatchers != null)
+            {
+                foreach (var watcher in _fileSystemWatchers)
+                {
+                    watcher.Dispose();
+                }
+            }
+            _timer = null;
+            _fileSystemWatchers = null;
+        }
+
+        /// <summary>
+        /// Removes OnTrigger events.
+        /// </summary>
+        public void DisposeTrigger()
+        {
+            OnTrigger = null;
+        }
+        
         private void TriggerReady(ManagedTaskSchedule trigger)
         {
-            if (OnTrigger == null)
+            lock (_triggerLock) // trigger lock is to avoid double trigger
             {
-                _previousTrigger = true;
-            }
-            else
-            {
-                OnTrigger?.Invoke(this, EventArgs.Empty);
+                // if there is no trigger set, the previousTrigger is flagged to record the trigger.
+                if (OnTrigger == null)
+                {
+                    _previousTrigger = true;
+                }
+                else
+                {
+                    OnTrigger?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
+        
+        private void FileReady(object sender, FileSystemEventArgs e)
+        {
+            // filesystemwatcher triggers mutiple times in some scenios.  So use a dictionary to make sure same file isn't triggered twice.
+            lock (_filesProcessed)
+            {
+                if (_filesProcessed.Contains(e.Name))
+                {
+                    return;
+                }
+                _filesProcessed.Add(e.Name);
+            }
+
+            lock (_triggerLock) // trigger lock is to avoid double trigger
+            {
+                if (_fileSystemWatchers != null)
+                {
+                    // Wait if file is still open
+                    // ensures files which are copying do not process until complete
+                    FileInfo fileInfo = new FileInfo(e.FullPath);
+//                    while (IsFileLocked(fileInfo))
+//                    {
+//                        Thread.Sleep(500);
+//                    }
+
+                    // if there is no trigger set, the previousTrigger is flagged to record the trigger.
+                    if (OnTrigger == null)
+                    {
+                        _previousTrigger = true;
+                    }
+                    else
+                    {
+                        OnTrigger?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+
+            //wait a second, and clean the file from the dictionary.
+            var timer = new System.Timers.Timer(1000d) {AutoReset = false};
+            timer.Elapsed += (timerElapsedSender, timerElapsedArgs) =>
+            {
+                lock (_filesProcessed)
+                {
+                    _filesProcessed.Remove(e.FullPath);
+                }
+            };
+            timer.Start();
+
+        }
+        
+        private bool IsFileLocked(FileInfo file)
+        {
+            FileStream stream = null;
+
+            try
+            {
+                stream = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException ex)
+            {
+                //the file is unavailable because it is:
+                //still being written to
+                //or being processed by another thread
+                //or does not exist (has already been processed)
+                return true;
+            }
+            finally
+            {
+                stream?.Close();
+            }
+
+            //file is not locked
+            return false;
+        }
+
 
         public bool CheckPreviousTrigger()
         {
@@ -316,7 +449,8 @@ namespace dexih.utils.ManagedTasks
             Success = false;
             Message = "The task was cancelled.";
             SetStatus(EManagedTaskStatus.Cancelled);
-            _timer?.Dispose();
+            DisposeSchedules();
+            DisposeTrigger();
         }
 
         public void Error(string message, Exception ex)
@@ -336,11 +470,13 @@ namespace dexih.utils.ManagedTasks
 
         public void Dispose()
         {
-            _timer?.Dispose();
+            DisposeSchedules();
+            DisposeTrigger();
             OnProgress = null;
             OnStatus = null;
             OnTrigger = null;
             OnSchedule = null;
+            OnFileWatch = null;
         }
 
         private string _exceptionDetails;

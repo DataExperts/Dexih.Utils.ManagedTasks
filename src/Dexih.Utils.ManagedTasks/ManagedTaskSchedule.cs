@@ -359,8 +359,8 @@ namespace dexih.utils.ManagedTasks
 
         private DateTime? NextOccurranceInterval(DateTime fromDate)
         {
-            var dailyStart = StartTime == null ? new TimeSpan(0, 0, 0) : (TimeSpan)StartTime;
-            var dailyEnd = EndTime == null ? new TimeSpan(23, 59, 59) : (TimeSpan)EndTime;
+            var dailyStart = StartTime ?? new TimeSpan(0, 0, 0);
+            var dailyEnd = EndTime ?? new TimeSpan(23, 59, 59);
 
             //set the initial start date
             var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
@@ -417,12 +417,9 @@ namespace dexih.utils.ManagedTasks
                 passDate = true;
 
                 //if this is an invalid day, move to next day/starttime.
-                if (DaysOfWeek != null)
+                if (DaysOfWeek?.Contains(DayOfWeek(startAt)) == false)
                 {
-                    if (DaysOfWeek.Contains(DayOfWeek(startAt)) == false)
-                    {
-                        passDate = false;
-                    }
+                    passDate = false;
                 }
 
                 if (startAt.TimeOfDay < dailyStart || startAt.TimeOfDay > dailyEnd)

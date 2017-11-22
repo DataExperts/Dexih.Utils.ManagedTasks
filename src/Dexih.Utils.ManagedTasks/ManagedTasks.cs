@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,8 +17,11 @@ namespace dexih.utils.ManagedTasks
 		public event EventHandler<EManagedTaskStatus> OnStatus;
 		public event EventHandler<ManagedTaskProgressItem> OnProgress;
 
+		private readonly int _maxConcurrent;
+		
 		private long _createdCount;
 		private long _scheduledCount;
+		private long _fileWatchCount;
 		private long _queuedCount;
 		private long _runningCount;
 		private long _completedCount;
@@ -26,6 +30,7 @@ namespace dexih.utils.ManagedTasks
 		
         public long CreatedCount => _createdCount;
 		public long ScheduledCount => _scheduledCount;
+		public long FileWatchCount => _fileWatchCount;
         public long QueuedCount => _queuedCount;
         public long RunningCount => _runningCount;
         public long CompletedCount => _completedCount;
@@ -35,23 +40,32 @@ namespace dexih.utils.ManagedTasks
 
         private readonly ConcurrentDictionary<string , ManagedTask> _activeTasks;
 		private readonly ConcurrentDictionary<(string category, long categoryKey), ManagedTask> _activeCategoryTasks;
+		private readonly ConcurrentDictionary<string, ManagedTask> _runningTasks;
+		private readonly ConcurrentQueue<ManagedTask> _queuedTasks;
+		private readonly ConcurrentDictionary<string, ManagedTask> _scheduledTasks;
 		private readonly ConcurrentDictionary<(string category, long categoryKey), ManagedTask> _completedTasks;
 
+		private readonly ConcurrentDictionary<string, ManagedTask> _taskChangeHistory;
+		
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
 		private TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
         private int _resetRunningCount;
 
-		public ManagedTaskHandler TaskHandler { get; private set; }
+		private object _taskAddLock = 1;
+		private object _triggerLock = 1;
 
-		public ManagedTasks(ManagedTaskHandler taskHandler = null)
+		public ManagedTasks(int maxConcurrent = 100)
 		{
-			TaskHandler = taskHandler ?? new ManagedTaskHandler();
-			TaskHandler.OnStatus += StatusChange;
-			TaskHandler.OnProgress += ProgressChange;
+			_maxConcurrent = maxConcurrent;
 
 			_activeTasks = new ConcurrentDictionary<string, ManagedTask>();
 			_activeCategoryTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
 			_completedTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
+			_runningTasks = new ConcurrentDictionary<string, ManagedTask>();
+			_queuedTasks = new ConcurrentQueue<ManagedTask>();
+			_scheduledTasks = new ConcurrentDictionary<string, ManagedTask>();
+			_taskChangeHistory = new ConcurrentDictionary<string, ManagedTask>();
+
             _noMoreTasks = new TaskCompletionSource<bool>(false);
 		}
 
@@ -66,11 +80,16 @@ namespace dexih.utils.ManagedTasks
 			{
 				throw new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
 			}
+			
+			managedTask.OnStatus += StatusChange;
+            managedTask.OnProgress += ProgressChanged;
 
 			// if there are no depdencies, put the task immediately on the queue.
-			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) && (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
+			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
+			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
+			    (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
 			{
-				TaskHandler.Add(managedTask);
+				Start(managedTask.Reference);
 			}
 			else
 			{
@@ -82,7 +101,7 @@ namespace dexih.utils.ManagedTasks
 					}
 				}
 				
-				TaskHandler.AddScheduled(managedTask);
+				Schedule(managedTask.Reference);
 			}
 
 			return managedTask;
@@ -93,11 +112,21 @@ namespace dexih.utils.ManagedTasks
             return Add(originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
         }
 
+		public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		{
+			return Add(originatorId, name, category, 0, 0, data, action, triggers, fileWatchers, dependentReferences);
+		}
+
         public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
             return Add(originatorId, name, category, 0, 0, data, action, triggers, null);
         }
 
+		public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers)
+		{
+			return Add(originatorId, name, category, 0, 0, data, action, triggers, fileWatchers, null);
+		}
+		
         public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action)
         {
             return Add(originatorId, name, category, 0, 0, data, action, null, null);
@@ -106,22 +135,38 @@ namespace dexih.utils.ManagedTasks
         public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
-			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, dependentReferences);
+			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, null, dependentReferences);
+		}
+		
+		public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		{
+			var reference = Guid.NewGuid().ToString();
+			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, fileWatchers, dependentReferences);
 		}
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
+            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null, dependentReferences);
         }
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null);
+            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null, null);
         }
+		
+		public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences)
+		{
+			return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, fileWatcher, dependentReferences);
+		}
+
+		public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher)
+		{
+			return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, fileWatcher, null);
+		}
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTaskProgress, CancellationToken, Task> action)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, null, null);
+            return Add(reference, originatorId, name, category, 0, 0, data, action, null, null, null);
         }
 
 		/// <summary>
@@ -138,7 +183,7 @@ namespace dexih.utils.ManagedTasks
 		/// <param name="triggers"></param>
 		/// <param name="dependentReferences"></param>
 		/// <returns></returns>
-		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask
 			{
@@ -151,7 +196,8 @@ namespace dexih.utils.ManagedTasks
 				Data = data,
 				Action = action,
 				Triggers = triggers,
-				DependentReferences = dependentReferences
+				FileWatchers = fileWatchers,
+				DependentReferences = dependentReferences,
 			};
 
 			return Add(managedTask);
@@ -163,10 +209,19 @@ namespace dexih.utils.ManagedTasks
 			{
 				var managedTask = (ManagedTask)sender;
 
+				var oldStatus = managedTask.Status;
+				managedTask.Status = newStatus;
+
+				//store most recent update
+                _taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask );
+
 				switch (newStatus)
 				{
 					case EManagedTaskStatus.Created:
 						Interlocked.Increment(ref _createdCount);
+						break;
+					case EManagedTaskStatus.FileWatching:
+						Interlocked.Increment(ref _fileWatchCount);
 						break;
 					case EManagedTaskStatus.Scheduled:
 						Interlocked.Increment(ref _scheduledCount);
@@ -188,13 +243,41 @@ namespace dexih.utils.ManagedTasks
 						break;
 				}
 
-				OnStatus?.Invoke(sender, newStatus);
+				// if the status is finished update the queues
+				if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled || newStatus == EManagedTaskStatus.Error)
+				{
+					if (oldStatus == EManagedTaskStatus.Running)
+					{
+						if (!_runningTasks.TryRemove(managedTask.Reference, out var finishedTask))
+						{
+							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
+							_noMoreTasks.TrySetException(_exitException);
+							return;
+						}
+					}
+					
+					UpdateRunningQueue();
 
-                // if the status is finished (eg completed, cancelled, error) when remove the task and look for new tasks.
-                if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled || newStatus == EManagedTaskStatus.Error)
-                {
-                    ResetCompletedTask(managedTask);
-                }
+					if (newStatus == EManagedTaskStatus.Cancelled)
+					{
+						if (!_activeTasks.TryRemove(managedTask.Reference, out var finishedTask))
+						{
+							_exitException = new ManagedTaskException(managedTask, "Failed to remove the cancelled from the active tasks list.");
+							_noMoreTasks.TrySetException(_exitException);
+							return;
+						}
+					}
+					else
+					{
+						ReStartTask(managedTask);
+					}
+					OnStatus?.Invoke(sender, newStatus);
+
+				}
+				else
+				{
+					OnStatus?.Invoke(sender, newStatus);
+				}
 
 			}
 			catch (Exception ex)
@@ -204,14 +287,112 @@ namespace dexih.utils.ManagedTasks
 			}
 		}
 
-        private void ResetCompletedTask(ManagedTask managedTask)
+		private void Schedule(string reference)
+		{
+			var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
+			if (!taskFound)
+			{
+				throw new ManagedTaskException(managedTask,
+					"Failed start the task as it could not be found in the active task list.");
+			}
+
+			// StatusChange(managedTask, managedTask.Status);
+
+			// if the task was triggered previously, then start it.
+			if (managedTask.CheckPreviousTrigger())
+			{
+				Start(managedTask.Reference);
+			}
+			else
+			{
+				managedTask.OnTrigger += Trigger;
+				_scheduledTasks.TryAdd(managedTask.Reference, managedTask);
+			}
+		}
+		
+		
+		private void Start(string reference)
+		{
+			lock (_taskAddLock) // lock to ensure _runningTask.Count is consistent when adding the task
+			{
+				var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
+				if (!taskFound)
+				{
+					throw new ManagedTaskException(managedTask,
+						"Failed start the task as it could not be found in the task handler.");
+				}
+                
+				if (_runningTasks.Count < _maxConcurrent)
+				{
+					var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
+					if (!tryaddTask)
+					{
+						throw new ManagedTaskException(managedTask,
+							"Failed to add the managed task to the running tasks queue.");
+					}
+
+					managedTask.Start();
+				}
+				else
+				{
+					_queuedTasks.Enqueue(managedTask);
+				}
+			}
+		}
+
+		
+		private void UpdateRunningQueue()
+        {
+
+            lock (_taskAddLock)
+            {
+                // update the running queue
+                while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
+                {
+                    if (!_queuedTasks.TryDequeue(out var queuedTask))
+                    {
+                        // something wrong with concurrency if this is hit.
+                        _exitException = new ManagedTaskException(queuedTask,
+                            "Failed to remove the task from the queued tasks list.");
+                        _noMoreTasks.TrySetException(_exitException);
+                        return;
+                    }
+
+                    // if the task is marked as cancelled just ignore it
+                    if (queuedTask.Status == EManagedTaskStatus.Cancelled)
+                    {
+                        OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
+                        continue;
+                    }
+
+                    if (!_runningTasks.TryAdd(queuedTask.Reference, queuedTask))
+                    {
+                        // something wrong with concurrency if this is hit.
+                        _exitException = new ManagedTaskException(queuedTask,
+                            "Failed to add the task from the running tasks list.");
+                        _noMoreTasks.TrySetException(_exitException);
+                        return;
+                    }
+
+                    queuedTask.Start();
+                }
+
+                // if there are no remainning tasks, set the trigger to allow WhenAll to run.
+//                if (_runningTasks.Count == 0 && _queuedTasks.Count == 0 && _scheduledTasks.Count == 0)
+//                {
+//                    _noMoreTasks.TrySetResult(true);
+//                }
+            }
+        }
+
+        private void ReStartTask(ManagedTask managedTask)
         {
           	Interlocked.Increment(ref _resetRunningCount);
 
             if (managedTask.Schedule())
             {
                 managedTask.Reset();
-	            TaskHandler.AddScheduled(managedTask);
+	            Schedule(managedTask.Reference);
             }
             else
             {
@@ -219,13 +400,15 @@ namespace dexih.utils.ManagedTasks
                 {
                     return;
                 }
+	            
+	            managedTask.Dispose();
 
                 if (!_activeTasks.TryRemove(managedTask.Reference, out var activeTask))
                 {
-                    _exitException = new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
+                    _exitException = new ManagedTaskException(managedTask, "Failed to remove the task to the active tasks list.");
 	                _noMoreTasks.TrySetException(_exitException);
                 }
-
+	            
                 _completedTasks.AddOrUpdate((activeTask.Category, activeTask.CatagoryKey), activeTask, (oldKey, oldValue) => activeTask);
             }
 
@@ -253,7 +436,7 @@ namespace dexih.utils.ManagedTasks
                             activeTask.DepedenciesMet = true;
                             if (activeTask.Schedule())
                             {
-                                TaskHandler.Add(activeTask);
+                                Start(activeTask.Reference);
                             }
                         }
                     }
@@ -268,10 +451,26 @@ namespace dexih.utils.ManagedTasks
 			}
 		}
 
-		private void ProgressChange(object sender, ManagedTaskProgressItem progress)
+		private void ProgressChanged(object sender, ManagedTaskProgressItem progress)
 		{
+			var managedTask = (ManagedTask)sender;
+			_taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask);
 			OnProgress?.Invoke(sender, progress);
 		}
+		
+	   private void Trigger(object sender, EventArgs e)
+        {
+            lock (_triggerLock)
+            {
+                var managedTask = (ManagedTask) sender;
+                var success = _scheduledTasks.TryRemove(managedTask.Reference, out ManagedTask removedTask);
+                if (success) // if the schedule task could not be removed, it is due to two simultaneous triggers occurring, so ignore.
+                {
+                    managedTask.DisposeTrigger(); //stop the trigger whilst the task is running.
+                    Start(managedTask.Reference);
+                }
+            }
+        }
 
 		public Task WhenAll()
 		{
@@ -283,7 +482,7 @@ namespace dexih.utils.ManagedTasks
 		{
 			var resetValue = false;
 			
-			while (!resetValue || (_activeTasks.Count > 0 && _resetRunningCount == 0))
+			while (!resetValue && !(_activeTasks.Count == 0 && _resetRunningCount == 0))
 			{
 				await Task.WhenAny(_noMoreTasks.Task, Task.Delay(-1, cancellationToken));
 
@@ -345,10 +544,28 @@ namespace dexih.utils.ManagedTasks
 				}
 			}
 		}
+		
+        public IEnumerable<ManagedTask> GetTaskChanges(bool resetTaskChanges = false)
+        {
+            var taskChanges = _taskChangeHistory.Values;
+            if (resetTaskChanges) ResetTaskChanges();
+
+            return taskChanges;
+        }
+
+        public int TaskChangesCount()
+        {
+            return _taskChangeHistory.Count;
+        }
+
+        private void ResetTaskChanges()
+        {
+            _taskChangeHistory.Clear();
+        }
+
 
         public void Dispose()
         {
-            TaskHandler.Dispose();
             OnProgress = null;
             OnStatus = null;
         }
