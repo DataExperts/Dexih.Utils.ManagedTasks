@@ -297,10 +297,10 @@ namespace dexih.utils.ManagedTasks
                     // Wait if file is still open
                     // ensures files which are copying do not process until complete
                     FileInfo fileInfo = new FileInfo(e.FullPath);
-//                    while (IsFileLocked(fileInfo))
-//                    {
-//                        Thread.Sleep(500);
-//                    }
+                    while (IsFileLocked(fileInfo))
+                    {
+                        Thread.Sleep(100);
+                    }
 
                     // if there is no trigger set, the previousTrigger is flagged to record the trigger.
                     if (OnTrigger == null)

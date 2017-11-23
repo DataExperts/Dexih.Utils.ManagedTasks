@@ -504,7 +504,7 @@ namespace dexih.functions.tests
 
             for (var i = 0; i < 5; i++)
             {
-                File.Create(Path.Combine(path, "test-" + Guid.NewGuid()));
+                File.Create(Path.Combine(path, "test-" + Guid.NewGuid())).Close();
                 await Task.Delay(1000);
             }
             
@@ -516,8 +516,8 @@ namespace dexih.functions.tests
 
             // filewatch count will be 6.  One for each file (5), and then another for the next watcher that was started before the cancel.
             Assert.Equal(6, fileWatchCount);
-
             Assert.Equal(6, managedTasks.FileWatchCount);
+
             Assert.Equal(5, managedTasks.CompletedCount);
 
             // should 5 seconds (with tollernace)
