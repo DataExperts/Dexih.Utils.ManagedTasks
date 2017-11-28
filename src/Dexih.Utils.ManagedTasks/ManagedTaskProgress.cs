@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace dexih.utils.ManagedTasks
+namespace Dexih.Utils.ManagedTasks
 {
     public class ManagedTaskProgress : Progress<ManagedTaskProgressItem>
     {

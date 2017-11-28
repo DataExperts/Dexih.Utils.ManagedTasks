@@ -1,4 +1,4 @@
-﻿using dexih.utils.ManagedTasks;
+﻿using Dexih.Utils.ManagedTasks;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -38,9 +38,9 @@ namespace dexih.functions.tests
         [InlineData(2000)]
         public async Task ParalleManagedTaskHandlerConcurrent(int taskCount)
         {
-            var handler = new ManagedTasks();
+            var managedTasks = new ManagedTasks();
 
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(1);
             }
@@ -50,19 +50,21 @@ namespace dexih.functions.tests
                 var task = new ManagedTask()
                 {
                     Reference = Guid.NewGuid().ToString(),
-                    CatagoryKey = 1,
+                    CatagoryKey = i,
                     Name = "task",
                     Category = "123",
                     Action = Action
                 };
-                handler.Add(task);
+                managedTasks.Add(task);
             }
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
-            await handler.WhenAll(cts.Token);
+            await managedTasks.WhenAll(cts.Token);
 
-            Assert.Equal(taskCount, handler.CompletedCount);
+            PrintManagedTasksCounters(managedTasks);
+            
+            Assert.Equal(taskCount, managedTasks.CompletedCount);
         }
 
         [Fact]
@@ -71,7 +73,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i <= 5; i++)
                 {
@@ -115,7 +117,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i <= 5; i++)
                 {
@@ -175,7 +177,7 @@ namespace dexih.functions.tests
             managedTasks.OnStatus += CompletedCounter;
 
             // simple task reports progress 10 times.
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 for (var i = 0; i < 10; i++)
                 {
@@ -224,7 +226,7 @@ namespace dexih.functions.tests
                 var startedTaskCount = 0;
 
                 // task throws an error.
-                async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+                async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
                 {
                     Interlocked.Increment(ref startedTaskCount);
                     await Task.Run(() => throw new Exception("An error"));
@@ -272,7 +274,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that can be cancelled
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 try
                 {
@@ -328,7 +330,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -354,7 +356,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -381,7 +383,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds to run
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 await Task.Delay(5000, cancellationToken);
             }
@@ -416,7 +418,7 @@ namespace dexih.functions.tests
             var startTime = DateTime.Now.TimeOfDay;
 
             // simple task that takes 1 second to run
-            async Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 _output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime));
                 await Task.Delay(1000, cancellationToken);
@@ -472,7 +474,7 @@ namespace dexih.functions.tests
             var startTime = DateTime.Now;
            
             // simple task that deletes the file that was being watched.
-            Task Action(ManagedTaskProgress progress, CancellationToken cancellationToken)
+            Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
                 _output.WriteLine("task started - " + DateTime.Now);
                 var files = Directory.GetFiles(path);

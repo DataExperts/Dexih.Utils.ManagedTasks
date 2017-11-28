@@ -1,10 +1,10 @@
-﻿using dexih.utils.ManagedTasks;
+﻿using Dexih.Utils.ManagedTasks;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
 using Xunit.Abstractions;
-using static dexih.utils.ManagedTasks.ManagedTaskSchedule;
+using static Dexih.Utils.ManagedTasks.ManagedTaskSchedule;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -44,6 +44,7 @@ namespace Dexih.Utils.ManagedTasks
             };
 
             var nextSchedule = (DateTime)schedule.NextOcurrance(currentDate);
+            output.WriteLine($"Schedule details {schedule.Details}.");
             output.WriteLine($"Schedule time {nextSchedule}.");
 
             TimeTest(DateTime.Now.AddMinutes(1), nextSchedule);
@@ -63,6 +64,7 @@ namespace Dexih.Utils.ManagedTasks
             };
 
             var nextSchedule = (DateTime)schedule.NextOcurrance(currentDate);
+            output.WriteLine($"Schedule details {schedule.Details}.");
             output.WriteLine($"Schedule time {nextSchedule}.");
 
             TimeTest(DateTime.Now.AddDays(1).AddMinutes(-2), nextSchedule);
@@ -80,6 +82,7 @@ namespace Dexih.Utils.ManagedTasks
             //the schedule once should return null if the startdate is in the past.
             var startDate2 = DateTime.Now.AddHours(-1);
             var schedule2 = new ManagedTaskSchedule(startDate2);
+            output.WriteLine($"Schedule details {schedule.Details}.");
             Assert.Null(schedule2.NextOcurrance(DateTime.Now));
 
         }

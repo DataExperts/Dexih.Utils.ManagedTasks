@@ -5,7 +5,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace dexih.utils.ManagedTasks
+namespace Dexih.Utils.ManagedTasks
 {
     /// <summary>
     /// The trigger class allows a schedule to be implmeneted via the parameters.
@@ -141,7 +141,7 @@ namespace dexih.utils.ManagedTasks
         {
             get
             {
-                if (_details == null)
+                if (_details != null)
                 {
                     return _details;
                 }
@@ -174,7 +174,7 @@ namespace dexih.utils.ManagedTasks
                         break;
                 }
 
-                if (DaysOfWeek.Length > 0 && DaysOfWeek.Length < 7)
+                if (DaysOfWeek != null && DaysOfWeek.Length > 0 && DaysOfWeek.Length < 7)
                 {
                     desc.AppendLine("Only on day(s):" + string.Join(",", DaysOfWeek.Select(c => c.ToString()).ToArray()));
                 }
