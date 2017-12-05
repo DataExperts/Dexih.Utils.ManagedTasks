@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace Dexih.Utils.ManagedTasks
@@ -35,6 +36,15 @@ namespace Dexih.Utils.ManagedTasks
         public virtual void Start()
         {
             var filter = string.IsNullOrEmpty(Filter) ? "*" : Filter;
+
+            var existingFiles = Directory.GetFiles(Path, filter);
+            if (existingFiles.Any())
+            {
+                foreach (var file in existingFiles)
+                {
+                    FileReady(this, new FileSystemEventArgs(WatcherChangeTypes.Created, "", file));
+                }
+            }
             
             _fileSystemWatcher = new FileSystemWatcher(Path, filter)
             {
@@ -70,11 +80,11 @@ namespace Dexih.Utils.ManagedTasks
             // filesystemwatcher triggers mutiple times in some scenarios.  So use a dictionary to make sure same file isn't triggered twice.
             lock (_filesProcessed)
             {
-                if (_filesProcessed.Contains(e.Name))
+                if (_filesProcessed.Contains(e.FullPath))
                 {
                     return;
                 }
-                _filesProcessed.Add(e.Name);
+                _filesProcessed.Add(e.FullPath);
                 
                 // Wait if file is still open
                 // ensures files which are copying do not process until complete
