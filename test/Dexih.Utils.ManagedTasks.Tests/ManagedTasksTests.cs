@@ -460,6 +460,54 @@ namespace dexih.functions.tests
             Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
         }
 
+        
+        [Fact]
+        // test a scheduled task is added to the queue, and removed when cancelled.
+        public async Task Test_ManagedTask_Schedule_Recurring_Cancel()
+        {
+            var managedTasks = new ManagedTasks();
+            
+            var startTime = DateTime.Now.TimeOfDay;
+
+            // simple task that takes 1 second to run
+            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
+            {
+                _output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime));
+                await Task.Delay(1000, cancellationToken);
+            }
+            
+            var scheduleCount = 0;
+            
+            void OnSchedule(object sender, EManagedTaskStatus status)
+            {
+                if (status == EManagedTaskStatus.Scheduled)
+                {
+                    Interlocked.Increment(ref scheduleCount);
+                }
+            }
+
+            managedTasks.OnStatus += OnSchedule;
+
+            // starts in 1 second, then runs 1 second job
+            var trigger = new ManagedTaskSchedule()
+            {
+                StartDate = DateTime.Now,
+                StartTime = DateTime.Now.AddSeconds(100).TimeOfDay,
+                IntervalTime = TimeSpan.FromSeconds(2),
+                MaxRecurrs = 5
+            };
+
+            var task = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
+
+            Assert.Equal(1, managedTasks.GetScheduledTasks().Count());
+
+            await Task.Delay(2000, CancellationToken.None);
+            task.Cancel();
+            
+            Assert.Equal(0,  managedTasks.GetScheduledTasks().Count());
+            
+        }
+        
         [Fact]
         public async Task Test_ManagedTask_FileWatcher()
         {

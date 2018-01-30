@@ -257,6 +257,16 @@ namespace Dexih.Utils.ManagedTasks
 						}
 					}
 					
+					if (oldStatus == EManagedTaskStatus.Scheduled)
+					{
+						if (!_scheduledTasks.TryRemove(managedTask.Reference, out var _))
+						{
+							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the scheduled tasks list.");
+							_noMoreTasks.TrySetException(_exitException);
+							return;
+						}
+					}
+					
 					UpdateRunningQueue();
 
 					if (newStatus == EManagedTaskStatus.Cancelled)
@@ -484,8 +494,7 @@ namespace Dexih.Utils.ManagedTasks
 		public async Task WhenAll(CancellationToken cancellationToken)
 		{
 			_noMoreTasks = new TaskCompletionSource<bool>(false);
-			var resetValue = false;
-			
+
 			while (_activeTasks.Count > 0 || _resetRunningCount > 0)
 			{
 				await Task.WhenAny(_noMoreTasks.Task, Task.Delay(-1, cancellationToken));
@@ -531,6 +540,15 @@ namespace Dexih.Utils.ManagedTasks
                 return _activeTasks.Values;
             }
 			return _activeTasks.Values.Where(c => c.Category == category);
+		}
+		
+		public IEnumerable<ManagedTask> GetScheduledTasks(string category = null)
+		{
+			if(string.IsNullOrEmpty(category))
+			{
+				return _scheduledTasks.Values;
+			}
+			return _scheduledTasks.Values.Where(c => c.Category == category);
 		}
 
 		public IEnumerable<ManagedTask> GetCompletedTasks(string category = null)
@@ -578,7 +596,7 @@ namespace Dexih.Utils.ManagedTasks
             OnStatus = null;
         }
 
-		public bool ContainsKey(string category, long categoryKey)
+		private bool ContainsKey(string category, long categoryKey)
 		{
 			if (_activeTasks.Values.Any(c => c.Category == category && c.CatagoryKey == categoryKey))
 			{
