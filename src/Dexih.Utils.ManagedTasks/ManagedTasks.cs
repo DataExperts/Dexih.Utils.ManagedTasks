@@ -69,9 +69,9 @@ namespace Dexih.Utils.ManagedTasks
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
-			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CatagoryKey > 0 && ContainsKey(managedTask.Category, managedTask.CatagoryKey))
+			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CategoryKey > 0 && ContainsKey(managedTask.Category, managedTask.CategoryKey))
 			{
-				throw new ManagedTaskException(managedTask, $"The {managedTask.Category} - {managedTask.Name} with key {managedTask.CatagoryKey} is alredy active and cannot be run at the same time.");
+				throw new ManagedTaskException(managedTask, $"The {managedTask.Category} - {managedTask.Name} with key {managedTask.CategoryKey} is already active and cannot be run at the same time.");
 			}
 
 			if (!_activeTasks.TryAdd(managedTask.Reference, managedTask))
@@ -82,7 +82,7 @@ namespace Dexih.Utils.ManagedTasks
 			managedTask.OnStatus += StatusChange;
             managedTask.OnProgress += ProgressChanged;
 
-			// if there are no depdencies, put the task immediately on the queue.
+			// if there are no dependencies, put the task immediately on the queue.
 			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
 			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
 			    (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
@@ -171,7 +171,7 @@ namespace Dexih.Utils.ManagedTasks
 		/// Creates & starts a new managed task.
 		/// </summary>
 		/// <param name="reference"></param>
-		/// <param name="originatorId">Id that can be used to referernce where the task was started from.</param>
+		/// <param name="originatorId">Id that can be used to reference where the task was started from.</param>
 		/// <param name="data"></param>
 		/// <param name="action">The action </param>
 		/// <param name="name"></param>
@@ -190,7 +190,7 @@ namespace Dexih.Utils.ManagedTasks
 				OriginatorId = originatorId,
 				Name = name,
 				Category = category,
-				CatagoryKey = categoryKey,
+				CategoryKey = categoryKey,
 				HubKey = hubKey,
 				Data = data,
 				Action = action,
@@ -388,7 +388,7 @@ namespace Dexih.Utils.ManagedTasks
                     queuedTask.Start();
                 }
 
-                // if there are no remainning tasks, set the trigger to allow WhenAll to run.
+                // if there are no remaining tasks, set the trigger to allow WhenAll to run.
 //                if (_runningTasks.Count == 0 && _queuedTasks.Count == 0 && _scheduledTasks.Count == 0)
 //                {
 //                    _noMoreTasks.TrySetResult(true);
@@ -421,7 +421,7 @@ namespace Dexih.Utils.ManagedTasks
 					_noMoreTasks.TrySetException(_exitException);
 				}
 
-				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CatagoryKey), activeTask,
+				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CategoryKey), activeTask,
 					(oldKey, oldValue) => activeTask);
 			}
 
@@ -440,13 +440,13 @@ namespace Dexih.Utils.ManagedTasks
 						}
 					}
 
-					// if no depdent tasks are found, then the current task is ready to go.
+					// if no dependent tasks are found, then the current task is ready to go.
 					if (!depFound)
 					{
-						// check dependencies are not already met is not already set, which can happen when two depdent tasks finish at the same time.
-						if (!activeTask.DepedenciesMet)
+						// check dependencies are not already met is not already set, which can happen when two dependent tasks finish at the same time.
+						if (!activeTask.DependenciesMet)
 						{
-							activeTask.DepedenciesMet = true;
+							activeTask.DependenciesMet = true;
 							if (activeTask.Schedule())
 							{
 								Start(activeTask.Reference);
@@ -598,17 +598,17 @@ namespace Dexih.Utils.ManagedTasks
 
 		private bool ContainsKey(string category, long categoryKey)
 		{
-			if (_activeTasks.Values.Any(c => c.Category == category && c.CatagoryKey == categoryKey))
+			if (_activeTasks.Values.Any(c => c.Category == category && c.CategoryKey == categoryKey))
 			{
 				return true;
 			}
 			
-			if (_scheduledTasks.Values.Any(c => c.Category == category && c.CatagoryKey == categoryKey))
+			if (_scheduledTasks.Values.Any(c => c.Category == category && c.CategoryKey == categoryKey))
 			{
 				return true;
 			}
 
-			if (_queuedTasks.Any(c => c.Category == category && c.CatagoryKey == categoryKey))
+			if (_queuedTasks.Any(c => c.Category == category && c.CategoryKey == categoryKey))
 			{
 				return true;
 			}

@@ -77,7 +77,7 @@ namespace Dexih.Utils.ManagedTasks
 
         private void FileReady(object sender, FileSystemEventArgs e)
         {
-            // filesystemwatcher triggers mutiple times in some scenarios.  So use a dictionary to make sure same file isn't triggered twice.
+            // filesystemwatcher triggers multiple times in some scenarios.  So use a dictionary to make sure same file isn't triggered twice.
             lock (_filesProcessed)
             {
                 if (_filesProcessed.Contains(e.FullPath))
@@ -118,7 +118,7 @@ namespace Dexih.Utils.ManagedTasks
             {
                 stream = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None);
             }
-            catch (IOException ex)
+            catch (IOException)
             {
                 //the file is unavailable because it is:
                 //still being written to

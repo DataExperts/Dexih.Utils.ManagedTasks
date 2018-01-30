@@ -36,7 +36,7 @@ namespace dexih.functions.tests
 
         [Theory]
         [InlineData(2000)]
-        public async Task ParalleManagedTaskHandlerConcurrent(int taskCount)
+        public async Task ParallelManagedTaskHandlerConcurrent(int taskCount)
         {
             var managedTasks = new ManagedTasks();
 
@@ -50,7 +50,7 @@ namespace dexih.functions.tests
                 var task = new ManagedTask()
                 {
                     Reference = Guid.NewGuid().ToString(),
-                    CatagoryKey = i,
+                    CategoryKey = i,
                     Name = "task",
                     Category = "123",
                     Action = Action
@@ -128,7 +128,7 @@ namespace dexih.functions.tests
 
             var task1 = managedTasks.Add("123", "task", "test","category", 1, 1, "object", Action, null, null, null);
 
-            //adding the same task when runnning should result in error.
+            //adding the same task when running should result in error.
             Assert.Throws(typeof(ManagedTaskException), () =>
             {
                 var task2 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null, null);
@@ -201,7 +201,7 @@ namespace dexih.functions.tests
             Assert.Equal(taskCount, managedTasks.GetCompletedTasks().Count());
             Assert.Equal(taskCount, managedTasks.CompletedCount);
 
-            // counter should eqaul the number of tasks
+            // counter should equal the number of tasks
             Assert.Equal(taskCount, runningCounter);
             Assert.Equal(taskCount, completedCounter);
             Assert.Equal(0, managedTasks.Count());
@@ -249,7 +249,7 @@ namespace dexih.functions.tests
 
                 Assert.Equal(taskCount, startedTaskCount);
 
-                // all error counters should eqaul the number of tasks
+                // all error counters should equal the number of tasks
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
                 Assert.Equal(taskCount, _errorCount);
                 Assert.Equal(0, managedTasks.Count());
@@ -306,7 +306,7 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
 
 
-            // counter should eqaul the number of tasks
+            // counter should equal the number of tasks
             Assert.Equal(100, _cancelCounter);
             Assert.Equal(0, managedTasks.Count());
         }
@@ -398,7 +398,7 @@ namespace dexih.functions.tests
                 IntervalType = ManagedTaskSchedule.EIntervalType.Once
             };
             
-            _output.WriteLine($"Time to Start: {trigger.NextOcurrance(DateTime.Now)-DateTime.Now}");
+            _output.WriteLine($"Time to Start: {trigger.NextOccurrence(DateTime.Now)-DateTime.Now}");
 
             var task1 = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
 
@@ -442,7 +442,7 @@ namespace dexih.functions.tests
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(1).TimeOfDay,
                 IntervalTime = TimeSpan.FromSeconds(2),
-                MaxRecurrs = 5
+                MaxRecurs = 5
             };
 
             managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
@@ -456,7 +456,7 @@ namespace dexih.functions.tests
             Assert.Equal(5, managedTasks.ScheduledCount);
             Assert.Equal(5, managedTasks.CompletedCount);
 
-            // 10 seconds = Initial 1 + 2 *(5-1) recurrs + 1 final job
+            // 10 seconds = Initial 1 + 2 *(5-1) recurs + 1 final job
             Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
         }
 
@@ -494,7 +494,7 @@ namespace dexih.functions.tests
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(100).TimeOfDay,
                 IntervalTime = TimeSpan.FromSeconds(2),
-                MaxRecurrs = 5
+                MaxRecurs = 5
             };
 
             var task = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
@@ -570,7 +570,7 @@ namespace dexih.functions.tests
 
             Assert.Equal(5, managedTasks.CompletedCount);
 
-            // should 5 seconds (with tollernace)
+            // should 5 seconds (with tolerance)
             Assert.True(startTime.AddSeconds(5) < DateTime.Now && startTime.AddSeconds(5.5) > DateTime.Now);
         }
 

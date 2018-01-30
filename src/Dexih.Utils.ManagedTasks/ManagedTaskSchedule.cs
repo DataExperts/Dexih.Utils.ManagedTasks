@@ -8,7 +8,7 @@ using Newtonsoft.Json.Converters;
 namespace Dexih.Utils.ManagedTasks
 {
     /// <summary>
-    /// The trigger class allows a schedule to be implmeneted via the parameters.
+    /// The trigger class allows a schedule to be implemented via the parameters.
     /// This can then be called to provide the NextTrigger, which is the next date/time the execution should occur.
     /// </summary>
     public class ManagedTaskSchedule
@@ -61,14 +61,14 @@ namespace Dexih.Utils.ManagedTasks
         }
 
         /// <summary>
-        /// Create a trigger that starts now, and executes every interval for a maximum of recurrances.
+        /// Create a trigger that starts now, and executes every interval for a maximum of recurrences.
         /// </summary>
         /// <param name="intervalTime">Interval time</param>
-        /// <param name="maxRecurrs">Maximum number of recurrances</param>
-        public ManagedTaskSchedule(TimeSpan intervalTime, int maxRecurrs)
+        /// <param name="maxRecurs">Maximum number of recurrences</param>
+        public ManagedTaskSchedule(TimeSpan intervalTime, int maxRecurs)
         {
             IntervalTime = intervalTime;
-            MaxRecurrs = maxRecurrs;
+            MaxRecurs = maxRecurs;
         }
 
         /// <summary>
@@ -127,9 +127,9 @@ namespace Dexih.Utils.ManagedTasks
         public TimeSpan? EndTime { get; set; }
 
         /// <summary>
-        /// Maximum number of times the schedule recurrs.  If null or -1, this will be infinite.
+        /// Maximum number of times the schedule recurs.  If null or -1, this will be infinite.
         /// </summary>
-        public int? MaxRecurrs { get; set; }
+        public int? MaxRecurs { get; set; }
 
 
         private string _details;
@@ -163,7 +163,7 @@ namespace Dexih.Utils.ManagedTasks
                             desc.AppendLine($"Starts at {StartDateTimeDesc()}");
                             if (IntervalTime != null) desc.AppendLine($"Every {IntervalTime.Value.ToString()}");
                             desc.AppendLine("Between " + (StartTime == null ? "00:00:00" : StartTime.Value.ToString()) + " and " + (EndTime == null ? "23:59:59" : EndTime.Value.ToString()));
-                            if (MaxRecurrs != null || MaxRecurrs < 0) desc.AppendLine("Maximum recurrances of " + MaxRecurrs.Value);
+                            if (MaxRecurs != null || MaxRecurs < 0) desc.AppendLine("Maximum recurrences of " + MaxRecurs.Value);
                         }
                         break;
                     case EIntervalType.Daily:
@@ -223,22 +223,22 @@ namespace Dexih.Utils.ManagedTasks
         /// Retrieves the next time this schedule will occur from the specified date.
         /// </summary>
         /// <returns>DateTime of schedule, or null if no date is available</returns>
-        public DateTime? NextOcurrance(DateTime fromDate)
+        public DateTime? NextOccurrence(DateTime fromDate)
         {
             DateTime? nextDate = null;
             switch(IntervalType)
             {
                 case EIntervalType.Daily:
-                    nextDate = NextOccurranceDaily(fromDate);
+                    nextDate = NextOccurrenceDaily(fromDate);
                     break;
                 case EIntervalType.Interval:
-                    nextDate = NextOccurranceInterval(fromDate);
+                    nextDate = NextOccurrenceInterval(fromDate);
                     break;
                 case EIntervalType.Monthly:
-                    nextDate = NextOccurranceMonthly(fromDate);
+                    nextDate = NextOccurrenceMonthly(fromDate);
                     break;
                 case EIntervalType.Once:
-                    nextDate = NextOccuranceOnce(fromDate);
+                    nextDate = NextOccurrenceOnce(fromDate);
                     break;
             }
 
@@ -249,7 +249,7 @@ namespace Dexih.Utils.ManagedTasks
             return nextDate;
         }
 
-        private DateTime? NextOccuranceOnce(DateTime fromDate)
+        private DateTime? NextOccurrenceOnce(DateTime fromDate)
         {
             // for once of, return the start date if it in the future
             if (StartDate == null)
@@ -268,7 +268,7 @@ namespace Dexih.Utils.ManagedTasks
             return null;
         }
 
-        private DateTime? NextOccurranceMonthly(DateTime fromDate)
+        private DateTime? NextOccurrenceMonthly(DateTime fromDate)
         {
             // check if a valid day has already occurred, this means we should jump to next month
             var priorDate = new DateTime(fromDate.Year, fromDate.Month, 1);
@@ -323,7 +323,7 @@ namespace Dexih.Utils.ManagedTasks
             return null;
         }
 
-        private DateTime? NextOccurranceDaily(DateTime fromDate)
+        private DateTime? NextOccurrenceDaily(DateTime fromDate)
         {
             var nextDate = fromDate;
 
@@ -357,7 +357,7 @@ namespace Dexih.Utils.ManagedTasks
             return null;
         }
 
-        private DateTime? NextOccurranceInterval(DateTime fromDate)
+        private DateTime? NextOccurrenceInterval(DateTime fromDate)
         {
             var dailyStart = StartTime ?? new TimeSpan(0, 0, 0);
             var dailyEnd = EndTime ?? new TimeSpan(23, 59, 59);
@@ -392,7 +392,7 @@ namespace Dexih.Utils.ManagedTasks
             //Combine that start date and time to get a final start date/time
             startAt = startAt.Add(dailyStart);
             var passDate = true;
-            var recurrs = 1;
+            var recurs = 1;
 
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
@@ -429,8 +429,8 @@ namespace Dexih.Utils.ManagedTasks
 
                 if (passDate)
                 {
-                    recurrs++;
-                    if (MaxRecurrs != null && recurrs > MaxRecurrs.Value)
+                    recurs++;
+                    if (MaxRecurs != null && recurs > MaxRecurs.Value)
                     {
                         // The trigger has exceeded the maximum recurrences
                         return null;

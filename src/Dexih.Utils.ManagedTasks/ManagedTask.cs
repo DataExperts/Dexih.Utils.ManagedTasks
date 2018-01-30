@@ -60,7 +60,7 @@ namespace Dexih.Utils.ManagedTasks
         public object Data { get; set; }
 
         public string Category { get; set; }
-		public long CatagoryKey { get; set; }
+		public long CategoryKey { get; set; }
 		public long HubKey { get; set; }
 
         public int Percentage { get; set; }
@@ -86,7 +86,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// Flag to indicate dependent tasks have been completed.
         /// </summary>
-        public bool DepedenciesMet {
+        public bool DependenciesMet {
             get => _dependenciesMet || DependentReferences == null || DependentReferences.Length == 0;
             set => _dependenciesMet = value;
         }
@@ -181,7 +181,7 @@ namespace Dexih.Utils.ManagedTasks
                 throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status);
             }
 
-            var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DepedenciesMet && RunCount == 0;
+            var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DependenciesMet && RunCount == 0;
 
             // if the filewatchers are not set, then set them.
             if (FileWatchers != null && FileWatchers.Any())
@@ -207,7 +207,7 @@ namespace Dexih.Utils.ManagedTasks
                 ManagedTaskSchedule startTrigger = null;
                 foreach (var trigger in Triggers)
                 {
-                    var triggerTime = trigger.NextOcurrance(DateTime.Now);
+                    var triggerTime = trigger.NextOccurrence(DateTime.Now);
                     if (triggerTime != null && (startAt == null || triggerTime < startAt))
                     {
                         startAt = triggerTime;
