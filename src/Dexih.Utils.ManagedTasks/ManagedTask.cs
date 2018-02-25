@@ -64,6 +64,7 @@ namespace Dexih.Utils.ManagedTasks
 		public long HubKey { get; set; }
 
         public int Percentage { get; set; }
+        public long Counter { get; set; }
         public string StepName { get; set; }
         
         public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
@@ -114,12 +115,8 @@ namespace Dexih.Utils.ManagedTasks
         private Task _task;
         private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
-        private bool _anotherProgressInvoke;
         private bool _previousTrigger;
-        
-        private HashSet<string> _filesProcessed;
-
-
+       
         private Timer _timer;
         private readonly object _triggerLock = 1;
 
@@ -127,6 +124,7 @@ namespace Dexih.Utils.ManagedTasks
 
         public ManagedTask()
         {
+            bool anotherProgressInvoke;
             LastUpdate = DateTime.Now;
             Status = EManagedTaskStatus.Created;
             _cancellationTokenSource = new CancellationTokenSource();
@@ -134,10 +132,11 @@ namespace Dexih.Utils.ManagedTasks
             // progress routine which calls the progress event async 
             _progress = new ManagedTaskProgress(value =>
             {
-                if (Percentage != value.Percentage || StepName != value.StepName)
+                if ( Percentage != value.Percentage || StepName != value.StepName || Counter != value.Counter)
                 {
                     Percentage = value.Percentage;
                     StepName = value.StepName;
+                    Counter = value.Counter;
                     
                     // if the previous progress has finished?
                     if (_progressInvoke == null || _progressInvoke.IsCompleted)
@@ -149,14 +148,14 @@ namespace Dexih.Utils.ManagedTasks
                             // if also ensures progress events are only sent one at a time.
                             do
                             {
-                                _anotherProgressInvoke = false;
+                                anotherProgressInvoke = false;
                                 OnProgress?.Invoke(this, value);
-                            } while (_anotherProgressInvoke);
+                            } while (anotherProgressInvoke);
                         });
                     }
                     else
                     {
-                        _anotherProgressInvoke = true;
+                        anotherProgressInvoke = true;
                     }
                 }
             });
@@ -223,6 +222,7 @@ namespace Dexih.Utils.ManagedTasks
                     
                     StepName = "Scheduled...";
                     Percentage = 0;
+                    Counter = 0;
                     
                     OnSchedule?.Invoke(this, EventArgs.Empty);
 

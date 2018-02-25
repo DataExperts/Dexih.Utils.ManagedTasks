@@ -521,6 +521,8 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
             var startTime = DateTime.Now;
            
+            _output.WriteLine($"Started at {DateTime.Now}.");
+
             // simple task that deletes the file that was being watched.
             Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
@@ -547,16 +549,21 @@ namespace dexih.functions.tests
             
             managedTasks.OnStatus += OnFileWatch;
             
+            _output.WriteLine($"Step 1 {DateTime.Now}.");
+
             var fileWatch = new ManagedTaskFileWatcher(path, "*");
 
             
             var fileTask = managedTasks.Add("123", "task3", "test", null, Action, null,  new[] { fileWatch });
 
+            _output.WriteLine($"Step 2 {DateTime.Now}.");
+            
             for (var i = 0; i < 5; i++)
             {
                 File.Create(Path.Combine(path, "test-" + Guid.NewGuid())).Close();
                 await Task.Delay(1000);
             }
+
             
             fileTask.Cancel();
             
@@ -571,6 +578,8 @@ namespace dexih.functions.tests
             Assert.Equal(5, managedTasks.CompletedCount);
 
             // should 5 seconds (with tolerance)
+            
+            _output.WriteLine($"Finished {DateTime.Now}.");
             Assert.True(startTime.AddSeconds(5) < DateTime.Now && startTime.AddSeconds(5.5) > DateTime.Now);
         }
 
