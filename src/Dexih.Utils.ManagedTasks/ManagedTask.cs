@@ -62,6 +62,7 @@ namespace Dexih.Utils.ManagedTasks
         public string Category { get; set; }
 		public long CategoryKey { get; set; }
 		public long HubKey { get; set; }
+        public string RemoteAgentId {get;set;}
 
         public int Percentage { get; set; }
         public long Counter { get; set; }

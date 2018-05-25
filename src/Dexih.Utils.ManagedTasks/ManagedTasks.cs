@@ -107,7 +107,7 @@ namespace Dexih.Utils.ManagedTasks
 
         public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
-            return Add(originatorId, name, category, 0, 0, data, action, triggers, dependentReferences);
+            return Add(originatorId, name, category, 0, "", 0, data, action, triggers, dependentReferences);
         }
 
 		public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
@@ -117,7 +117,7 @@ namespace Dexih.Utils.ManagedTasks
 
         public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
-            return Add(originatorId, name, category, 0, 0, data, action, triggers, null);
+            return Add(originatorId, name, category, 0, "", 0, data, action, triggers, null);
         }
 
 		public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers)
@@ -127,44 +127,44 @@ namespace Dexih.Utils.ManagedTasks
 		
         public ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action)
         {
-            return Add(originatorId, name, category, 0, 0, data, action, null, null);
+            return Add(originatorId, name, category, 0, "", 0, data, action, null, null);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
-			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, null, dependentReferences);
+			return Add(reference, originatorId, name, category, hubKey, remoteAgentId, categoryKey, data, action, triggers, null, dependentReferences);
 		}
 		
 		public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
-			return Add(reference, originatorId, name, category, hubKey, categoryKey, data, action, triggers, fileWatchers, dependentReferences);
+			return Add(reference, originatorId, name, category, hubKey, "", categoryKey, data, action, triggers, fileWatchers, dependentReferences);
 		}
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null, dependentReferences);
+            return Add(reference, originatorId, name, category, 0, "", 0, data, action, triggers, null, dependentReferences);
         }
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, null, null);
+            return Add(reference, originatorId, name, category, 0, "", 0, data, action, triggers, null, null);
         }
 		
 		public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences)
 		{
-			return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, fileWatcher, dependentReferences);
+			return Add(reference, originatorId, name, category, 0, "", 0, data, action, triggers, fileWatcher, dependentReferences);
 		}
 
 		public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher)
 		{
-			return Add(reference, originatorId, name, category, 0, 0, data, action, triggers, fileWatcher, null);
+			return Add(reference, originatorId, name, category, 0, "", 0, data, action, triggers, fileWatcher, null);
 		}
 
         public ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action)
         {
-            return Add(reference, originatorId, name, category, 0, 0, data, action, null, null, null);
+            return Add(reference, originatorId, name, category, 0, "", 0, data, action, null, null, null);
         }
 
 		/// <summary>
@@ -182,7 +182,7 @@ namespace Dexih.Utils.ManagedTasks
 		/// <param name="fileWatchers"></param>
 		/// <param name="dependentReferences"></param>
 		/// <returns></returns>
-		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask
 			{
@@ -192,6 +192,7 @@ namespace Dexih.Utils.ManagedTasks
 				Category = category,
 				CategoryKey = categoryKey,
 				HubKey = hubKey,
+				RemoteAgentId = remoteAgentId,
 				Data = data,
 				Action = action,
 				Triggers = triggers,

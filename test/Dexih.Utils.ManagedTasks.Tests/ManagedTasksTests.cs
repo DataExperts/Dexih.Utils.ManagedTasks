@@ -126,12 +126,12 @@ namespace dexih.functions.tests
                 }
             }
 
-            var task1 = managedTasks.Add("123", "task", "test","category", 1, 1, "object", Action, null, null, null);
+            var task1 = managedTasks.Add("123", "task", "test","category", 1, "id", 1, "object", Action, null, null, null);
 
             //adding the same task when running should result in error.
             Assert.Throws(typeof(ManagedTaskException), () =>
             {
-                var task2 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null, null);
+                var task2 = managedTasks.Add("123", "task", "test", "category", 1, "id", 1, "object", Action, null, null, null);
             });
 
             var cts = new CancellationTokenSource();
@@ -139,7 +139,7 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
 
             // add the same task again now the previous one has finished.
-            var task3 = managedTasks.Add("123", "task", "test", "category", 1, 1, "object", Action, null, null, null);
+            var task3 = managedTasks.Add("123", "task", "test", "category", 1, "id", 1, "object", Action, null, null, null);
 
             Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
         }
@@ -191,7 +191,7 @@ namespace dexih.functions.tests
             // add the simple task 100 times.
             for (var i = 0; i < taskCount; i++)
             {
-                managedTasks.Add("123", "task3", "test", 0 , i, null, Action, null, null);
+                managedTasks.Add("123", "task3", "test", 0 , "id", i, null, Action, null, null);
             }
 
             var cts = new CancellationTokenSource();
