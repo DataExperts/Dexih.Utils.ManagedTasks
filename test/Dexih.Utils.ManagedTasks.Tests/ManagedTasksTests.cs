@@ -552,8 +552,6 @@ namespace dexih.functions.tests
             _output.WriteLine($"Step 1 {DateTime.Now}.");
 
             var fileWatch = new ManagedTaskFileWatcher(path, "*");
-
-            
             var fileTask = managedTasks.Add("123", "task3", "test", null, Action, null,  new[] { fileWatch });
 
             _output.WriteLine($"Step 2 {DateTime.Now}.");

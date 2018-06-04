@@ -50,8 +50,8 @@ namespace Dexih.Utils.ManagedTasks
 		private TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
         private int _resetRunningCount;
 
-		private object _taskAddLock = 1;
-		private object _triggerLock = 1;
+		private readonly object _taskAddLock = 1;
+		private readonly object _triggerLock = 1;
 		
 		public ManagedTasks(int maxConcurrent = 100)
 		{
@@ -182,7 +182,7 @@ namespace Dexih.Utils.ManagedTasks
 		/// <param name="fileWatchers"></param>
 		/// <param name="dependentReferences"></param>
 		/// <returns></returns>
-		public ManagedTask Add(string reference, string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		public ManagedTask Add(string reference, string originatorId, string name, string category, long referenceKey, string referenceId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask
 			{
@@ -191,8 +191,8 @@ namespace Dexih.Utils.ManagedTasks
 				Name = name,
 				Category = category,
 				CategoryKey = categoryKey,
-				HubKey = hubKey,
-				RemoteAgentId = remoteAgentId,
+				ReferenceKey = referenceKey,
+				ReferenceId = referenceId,
 				Data = data,
 				Action = action,
 				Triggers = triggers,

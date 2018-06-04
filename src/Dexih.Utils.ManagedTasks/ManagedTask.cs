@@ -16,7 +16,7 @@ namespace Dexih.Utils.ManagedTasks
         Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
     }
     
-    public class ManagedTask: IDisposable
+    public sealed class ManagedTask: IDisposable
     {
         public event EventHandler<EManagedTaskStatus> OnStatus;
         public event EventHandler<ManagedTaskProgressItem> OnProgress;
@@ -57,15 +57,45 @@ namespace Dexih.Utils.ManagedTasks
 
         public EManagedTaskStatus Status { get; set; }
 
+        /// <summary>
+        /// Any data package to include with the task.
+        /// </summary>
         public object Data { get; set; }
 
+        /// <summary>
+        /// Any category that is used to group tasks
+        /// </summary>
         public string Category { get; set; }
+        
+        /// <summary>
+        /// A unique key for the item within the category.  If attempts are made to add two items with same
+        /// category key, an exception will be raised.
+        /// </summary>
 		public long CategoryKey { get; set; }
-		public long HubKey { get; set; }
-        public string RemoteAgentId {get;set;}
+        
+        /// <summary>
+        /// A long field that can be used as a reference key to the original object.
+        /// </summary>
+        public long ReferenceKey { get; set; }
+        
+        /// <summary>
+        /// A string field that can be used as a reference key to the oroginal object.
+        /// </summary>
+        public string ReferenceId { get; set; }
 
+        /// <summary>
+        /// The percentage completion of the task
+        /// </summary>
         public int Percentage { get; set; }
+        
+        /// <summary>
+        /// A counter used to indicate progress (such as rows processed).
+        /// </summary>
         public long Counter { get; set; }
+        
+        /// <summary>
+        /// A string use to include the progress step.
+        /// </summary>
         public string StepName { get; set; }
         
         public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
@@ -85,6 +115,7 @@ namespace Dexih.Utils.ManagedTasks
 
 
         private bool _dependenciesMet;
+        
         /// <summary>
         /// Flag to indicate dependent tasks have been completed.
         /// </summary>
@@ -435,7 +466,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Full trace of the exception.  This can either be set to a value, or 
         /// will be constructed from the exception.
         /// </summary>
-        public virtual string ExceptionDetails
+        public string ExceptionDetails
         {
             get
             {
