@@ -79,7 +79,7 @@ namespace Dexih.Utils.ManagedTasks
         public long ReferenceKey { get; set; }
         
         /// <summary>
-        /// A string field that can be used as a reference key to the oroginal object.
+        /// A string field that can be used as a reference key to the original object.
         /// </summary>
         public string ReferenceId { get; set; }
 

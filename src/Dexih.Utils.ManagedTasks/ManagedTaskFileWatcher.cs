@@ -51,6 +51,7 @@ namespace Dexih.Utils.ManagedTasks
                 EnableRaisingEvents = true,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size,
             };
+
             _fileSystemWatcher.Created += FileReady;
             IsStarted = true;
         }

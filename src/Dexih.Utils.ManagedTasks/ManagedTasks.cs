@@ -534,6 +534,11 @@ namespace Dexih.Utils.ManagedTasks
 			return _activeTasks.ContainsKey(reference) ? _activeTasks[reference] : null;
 		}
 
+		public ManagedTask GetTask(string category, long categoryKey)
+		{
+			return _activeTasks.Values.SingleOrDefault(c => c.Category == category && c.CategoryKey == categoryKey);
+		}
+
 		public IEnumerable<ManagedTask> GetActiveTasks(string category = null)
 		{
 			if(string.IsNullOrEmpty(category))

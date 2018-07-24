@@ -552,9 +552,14 @@ namespace dexih.functions.tests
             _output.WriteLine($"Step 1 {DateTime.Now}.");
 
             var fileWatch = new ManagedTaskFileWatcher(path, "*");
+
+            _output.WriteLine($"Step 1a {DateTime.Now}.");
+
             var fileTask = managedTasks.Add("123", "task3", "test", null, Action, null,  new[] { fileWatch });
 
-            _output.WriteLine($"Step 2 {DateTime.Now}.");
+            var startTime2 = DateTime.Now;
+
+            _output.WriteLine($"Step 2 {startTime2}.");
             
             for (var i = 0; i < 5; i++)
             {
@@ -578,7 +583,7 @@ namespace dexih.functions.tests
             // should 5 seconds (with tolerance)
             
             _output.WriteLine($"Finished {DateTime.Now}.");
-            Assert.True(startTime.AddSeconds(5) < DateTime.Now && startTime.AddSeconds(5.5) > DateTime.Now);
+            Assert.True(startTime2.AddSeconds(5) < DateTime.Now && startTime2.AddSeconds(5.5) > DateTime.Now);
         }
 
     }
