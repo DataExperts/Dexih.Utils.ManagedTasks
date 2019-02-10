@@ -330,8 +330,7 @@ namespace Dexih.Utils.ManagedTasks
 				var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
 				if (!taskFound)
 				{
-					throw new ManagedTaskException(managedTask,
-						"Failed to start the task as it could not be found in the active task list.");
+					throw new ManagedTaskException(null,$"Failed to start the task with reference {reference} as it could not be found in the active task list.");
 				}
                 
 				if (_runningTasks.Count < _maxConcurrent)
