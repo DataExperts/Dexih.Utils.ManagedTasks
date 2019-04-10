@@ -47,7 +47,10 @@ namespace Dexih.Utils.ManagedTasks
 		private readonly ConcurrentDictionary<string, ManagedTask> _taskChangeHistory;
 		
 		private Exception _exitException; //used to push exceptions to the WhenAny function.
-		private TaskCompletionSource<bool> _noMoreTasks; //event handler that triggers when all tasks completed.
+		
+		private readonly Queue<TaskCompletionSource<bool>> _awaitTasks; //event handler that triggers when all tasks completed.
+
+		
         private int _resetRunningCount;
 
 		private readonly object _taskAddLock = 1;
@@ -64,14 +67,36 @@ namespace Dexih.Utils.ManagedTasks
 			_scheduledTasks = new ConcurrentDictionary<string, ManagedTask>();
 			_taskChangeHistory = new ConcurrentDictionary<string, ManagedTask>();
 
-            _noMoreTasks = new TaskCompletionSource<bool>(false);
+			_awaitTasks = new Queue<TaskCompletionSource<bool>>();
 		}
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
 			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CategoryKey > 0 && ContainsKey(managedTask.Category, managedTask.CategoryKey))
 			{
-				throw new ManagedTaskException(managedTask, $"The {managedTask.Category} - {managedTask.Name} with key {managedTask.CategoryKey} is already active and cannot be run at the same time.");
+				switch (managedTask.ConcurrentTaskAction)
+				{
+					case EConcurrentTaskAction.Parallel:
+						break;
+					case EConcurrentTaskAction.Abend:
+						throw new ManagedTaskException(managedTask, $"The {managedTask.Category} - {managedTask.Name} (key {managedTask.CategoryKey}) is already active and cannot be run at the same time.");
+					case EConcurrentTaskAction.Sequence:
+						var depTasks = GetTasks(managedTask.Category, managedTask.CategoryKey);
+						var depReferences = depTasks.Select(c => c.Reference);
+						if (managedTask.DependentReferences == null)
+						{
+							managedTask.DependentReferences = depReferences.ToArray();
+						}
+						else
+						{
+							managedTask.DependentReferences =
+								managedTask.DependentReferences.Concat(depReferences).ToArray();
+						}
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
+				
 			}
 
 			if (!_activeTasks.TryAdd(managedTask.Reference, managedTask))
@@ -253,7 +278,7 @@ namespace Dexih.Utils.ManagedTasks
 						if (!_runningTasks.TryRemove(managedTask.Reference, out var _))
 						{
 							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
-							_noMoreTasks.TrySetException(_exitException);
+							SetException(_exitException);
 							return;
 						}
 					}
@@ -263,7 +288,7 @@ namespace Dexih.Utils.ManagedTasks
 						if (!_scheduledTasks.TryRemove(managedTask.Reference, out var _))
 						{
 							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the scheduled tasks list.");
-							_noMoreTasks.TrySetException(_exitException);
+							SetException(_exitException);
 							return;
 						}
 					}
@@ -274,8 +299,8 @@ namespace Dexih.Utils.ManagedTasks
 					{
 						if (!_activeTasks.TryRemove(managedTask.Reference, out var _))
 						{
-							_exitException = new ManagedTaskException(managedTask, "Failed to remove the cancelled from the active tasks list.");
-							_noMoreTasks.TrySetException(_exitException);
+							_exitException = new ManagedTaskException(managedTask, "Failed to remove the cancelled task from the active tasks list.");
+							SetException(_exitException);
 							return;
 						}
 					}
@@ -295,7 +320,7 @@ namespace Dexih.Utils.ManagedTasks
 			catch (Exception ex)
 			{
 				_exitException = ex;
-				_noMoreTasks.TrySetException(_exitException);
+				SetException(_exitException);
 			}
 		}
 
@@ -321,7 +346,30 @@ namespace Dexih.Utils.ManagedTasks
 				_scheduledTasks.TryAdd(managedTask.Reference, managedTask);
 			}
 		}
-		
+
+		private void SetException(Exception ex)
+		{
+			lock (_awaitTasks)
+			{
+				if (_awaitTasks.Count > 0)
+				{
+					var task = _awaitTasks.Dequeue();
+					task.SetException(ex);
+				}
+			}
+		}
+
+		private void SetResult(bool value)
+		{
+			lock (_awaitTasks)
+			{
+				if (_awaitTasks.Count > 0)
+				{
+					var task = _awaitTasks.Dequeue();
+					task.SetResult(value);
+				}
+			}
+		}
 		
 		private void Start(string reference)
 		{
@@ -365,14 +413,14 @@ namespace Dexih.Utils.ManagedTasks
                         // something wrong with concurrency if this is hit.
                         _exitException = new ManagedTaskException(queuedTask,
                             "Failed to remove the task from the queued tasks list.");
-                        _noMoreTasks.TrySetException(_exitException);
+                        SetException(_exitException);
                         return;
                     }
 
                     // if the task is marked as cancelled just ignore it
                     if (queuedTask.Status == EManagedTaskStatus.Cancelled)
                     {
-                        OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
+                        // OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
                         continue;
                     }
 
@@ -381,7 +429,7 @@ namespace Dexih.Utils.ManagedTasks
                         // something wrong with concurrency if this is hit.
                         _exitException = new ManagedTaskException(queuedTask,
                             "Failed to add the task from the running tasks list.");
-                        _noMoreTasks.TrySetException(_exitException);
+                        SetException(_exitException);
                         return;
                     }
 
@@ -418,7 +466,7 @@ namespace Dexih.Utils.ManagedTasks
 				{
 					_exitException =
 						new ManagedTaskException(managedTask, "Failed to remove the task to the active tasks list.");
-					_noMoreTasks.TrySetException(_exitException);
+					SetException(_exitException);
 				}
 
 				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CategoryKey), activeTask,
@@ -460,7 +508,7 @@ namespace Dexih.Utils.ManagedTasks
 
 			if (_activeTasks.Count == 0 && _resetRunningCount == 0)
 			{
-				_noMoreTasks.TrySetResult(true);
+				SetResult(true);
 			}
 		}
 
@@ -485,19 +533,15 @@ namespace Dexih.Utils.ManagedTasks
             }
         }
 
-		public Task WhenAll()
+		public async Task WhenAll(CancellationToken cancellationToken = default)
 		{
-			var cancellationToken = CancellationToken.None;
-			return WhenAll(cancellationToken);
-		}
-
-		public async Task WhenAll(CancellationToken cancellationToken)
-		{
-			_noMoreTasks = new TaskCompletionSource<bool>(false);
+			
+			var awaitTask = new TaskCompletionSource<bool>(false);
+			_awaitTasks.Enqueue(awaitTask);
 
 			while (_activeTasks.Count > 0 || _resetRunningCount > 0)
 			{
-				await Task.WhenAny(_noMoreTasks.Task, Task.Delay(-1, cancellationToken));
+				await Task.WhenAny(awaitTask.Task, Task.Delay(-1, cancellationToken));
 
 				if (_exitException != null)
 				{
@@ -509,13 +553,14 @@ namespace Dexih.Utils.ManagedTasks
 	                throw new TaskCanceledException();
                 }
 
-				if (_noMoreTasks.Task.Result)
+				if (awaitTask.Task.Result)
 				{
 					break;
 				}
-                _noMoreTasks = new TaskCompletionSource<bool>(false);
+				
+                awaitTask = new TaskCompletionSource<bool>(false);
+                _awaitTasks.Enqueue(awaitTask);
 			}
-
 		}
 
 		public IEnumerator<ManagedTask> GetEnumerator()
@@ -620,6 +665,15 @@ namespace Dexih.Utils.ManagedTasks
 
 			
 			return false;
+		}
+
+		private IEnumerable<ManagedTask> GetTasks(string category, long categoryKey)
+		{
+			var tasks = _activeTasks.Values.Where(c => c.Category == category && c.CategoryKey == categoryKey)
+				.Concat(_scheduledTasks.Values.Where(c => c.Category == category && c.CategoryKey == categoryKey))
+				.Concat(_queuedTasks.Where(c => c.Category == category && c.CategoryKey == categoryKey));
+
+			return tasks;
 		}
     }
 }

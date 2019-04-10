@@ -144,6 +144,77 @@ namespace dexih.functions.tests
             Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
         }
 
+        /// <summary>
+        /// Adds two tasks using the sequence action, and checks parallel, and sequential running.
+        /// </summary>
+        /// <returns></returns>
+        [Theory]
+        [InlineData(EConcurrentTaskAction.Sequence, EManagedTaskStatus.Completed)]
+        [InlineData(EConcurrentTaskAction.Parallel, EManagedTaskStatus.Error)]
+        public async Task Test_Add_SameTask_Actions(EConcurrentTaskAction concurrentTaskAction, EManagedTaskStatus status)
+        {
+            var managedTasks = new ManagedTasks();
+            var reference = 0;
+            
+            // add a series of tasks with various delays to ensure the task manager is running.
+            async Task Action1(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
+            {
+                await Task.Delay(20, cancellationToken); //small delay, means second task will increment first when parallel run, and second when sequential run
+                Interlocked.Increment(ref reference);
+                Assert.Equal(reference, managedTask.ReferenceKey);
+            }
+
+            Task Action2(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
+            {
+                Interlocked.Increment(ref reference);
+                Assert.Equal(reference, managedTask.ReferenceKey);
+                return Task.CompletedTask;
+            }
+            
+            var task1 = new ManagedTask
+            {
+                Reference = Guid.NewGuid().ToString(),
+                OriginatorId = "task",
+                Name = "test",
+                Category = "category",
+                CategoryKey = 1,
+                ReferenceKey = 1,
+                ReferenceId = "id",
+                Data = "object",
+                Action = Action1,
+                Triggers = null,
+                FileWatchers = null,
+                DependentReferences = null,
+                ConcurrentTaskAction = EConcurrentTaskAction.Sequence
+            };
+            
+            var task2 = new ManagedTask
+            {
+                Reference = Guid.NewGuid().ToString(),
+                OriginatorId = "task",
+                Name = "test",
+                Category = "category",
+                CategoryKey = 1,
+                ReferenceKey = 2,
+                ReferenceId = "id",
+                Data = "object",
+                Action = Action2,
+                Triggers = null,
+                FileWatchers = null,
+                DependentReferences = null,
+                ConcurrentTaskAction = concurrentTaskAction
+            };
+
+            managedTasks.Add(task1);
+            managedTasks.Add(task2);
+
+            await managedTasks.WhenAll();
+            
+            Assert.Equal(status, task2.Status);
+            Assert.Equal(2, reference);
+
+        }
+
 
 
         [Theory]
@@ -167,6 +238,10 @@ namespace dexih.functions.tests
                         break;
                     case EManagedTaskStatus.Completed:
                         Interlocked.Increment(ref completedCounter);
+                        if (completedCounter == taskCount)
+                        {
+                            _output.WriteLine("complete success");
+                        }
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(status), status, null);
@@ -194,6 +269,7 @@ namespace dexih.functions.tests
                 managedTasks.Add("123", "task3", "test", 0 , "id", i, null, Action, null, null);
             }
 
+            // use cancellation token to ensure test doesn't get stuck forever.
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
             await managedTasks.WhenAll(cts.Token);
@@ -201,7 +277,9 @@ namespace dexih.functions.tests
             Assert.Equal(taskCount, managedTasks.GetCompletedTasks().Count());
             Assert.Equal(taskCount, managedTasks.CompletedCount);
 
-            // counter should equal the number of tasks
+            // counter should equal the number of tasks8
+            _output.WriteLine($"runningCounter: {runningCounter}, completedCounter: {completedCounter}");
+            
             Assert.Equal(taskCount, runningCounter);
             Assert.Equal(taskCount, completedCounter);
             Assert.Equal(0, managedTasks.Count());
@@ -215,7 +293,6 @@ namespace dexih.functions.tests
             }
         }
 
-        int _errorCount = 0;
         [Theory]
         [InlineData(2)]
         [InlineData(500)]
@@ -224,6 +301,7 @@ namespace dexih.functions.tests
             using (var managedTasks = new ManagedTasks())
             {
                 var startedTaskCount = 0;
+                var errorCount = 0;
 
                 // task throws an error.
                 async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
@@ -231,9 +309,18 @@ namespace dexih.functions.tests
                     Interlocked.Increment(ref startedTaskCount);
                     await Task.Run(() => throw new Exception("An error"));
                 }
+                
+                void ErrorResult(object sender, EManagedTaskStatus status)
+                {
+                    if (status == EManagedTaskStatus.Error)
+                    {
+                        Assert.True(((ManagedTask)sender).Exception != null);
+                        Interlocked.Increment(ref errorCount);
+                    }
+                }
 
                 // add the error task multiple times.
-                _errorCount = 0;
+                errorCount = 0;
                 managedTasks.OnStatus += ErrorResult;
 
                 for (var i = 0; i < taskCount; i++)
@@ -251,20 +338,12 @@ namespace dexih.functions.tests
 
                 // all error counters should equal the number of tasks
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
-                Assert.Equal(taskCount, _errorCount);
+                Assert.Equal(taskCount, errorCount);
                 Assert.Equal(0, managedTasks.Count());
             }
-
         }
 
-        void ErrorResult(object sender, EManagedTaskStatus status)
-        {
-            if (status == EManagedTaskStatus.Error)
-            {
-                Assert.True(((ManagedTask)sender).Exception != null);
-                Interlocked.Increment(ref _errorCount);
-            }
-        }
+
 
 
         int _cancelCounter = 0;

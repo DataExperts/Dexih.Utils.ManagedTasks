@@ -15,6 +15,13 @@ namespace Dexih.Utils.ManagedTasks
     {
         Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
     }
+
+    public enum EConcurrentTaskAction
+    {
+        Parallel,
+        Abend,
+        Sequence
+    }
     
     public sealed class ManagedTask: IDisposable
     {
@@ -92,6 +99,11 @@ namespace Dexih.Utils.ManagedTasks
         /// A counter used to indicate progress (such as rows processed).
         /// </summary>
         public long Counter { get; set; }
+
+        /// <summary>
+        /// Action to take when a task with the same referenceKey is added.
+        /// </summary>
+        public EConcurrentTaskAction ConcurrentTaskAction { get; set; } = EConcurrentTaskAction.Abend;
         
         /// <summary>
         /// A string use to include the progress step.
