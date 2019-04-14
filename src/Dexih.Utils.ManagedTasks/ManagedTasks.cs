@@ -96,7 +96,6 @@ namespace Dexih.Utils.ManagedTasks
 					default:
 						throw new ArgumentOutOfRangeException();
 				}
-				
 			}
 
 			if (!_activeTasks.TryAdd(managedTask.Reference, managedTask))
@@ -109,8 +108,7 @@ namespace Dexih.Utils.ManagedTasks
 
 			// if there are no dependencies, put the task immediately on the queue.
 			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
-			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
-			    (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0))
+			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()))
 			{
 				Start(managedTask.Reference);
 			}
@@ -591,6 +589,16 @@ namespace Dexih.Utils.ManagedTasks
             }
 			return _activeTasks.Values.Where(c => c.Category == category);
 		}
+
+		public IEnumerable<ManagedTask> GetRunningTasks(string category = null)
+		{
+			if(string.IsNullOrEmpty(category))
+			{
+				return _runningTasks.Values;
+			}
+			return _runningTasks.Values.Where(c => c.Category == category);
+		}
+
 		
 		public IEnumerable<ManagedTask> GetScheduledTasks(string category = null)
 		{

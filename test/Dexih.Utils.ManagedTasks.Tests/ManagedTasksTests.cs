@@ -283,6 +283,8 @@ namespace dexih.functions.tests
             Assert.Equal(taskCount, runningCounter);
             Assert.Equal(taskCount, completedCounter);
             Assert.Equal(0, managedTasks.Count());
+            Assert.Equal(0, managedTasks.GetActiveTasks().Count());
+            Assert.Equal(0, managedTasks.GetRunningTasks().Count());
 
             // check the changes history
             var changes = managedTasks.GetTaskChanges().ToArray();
