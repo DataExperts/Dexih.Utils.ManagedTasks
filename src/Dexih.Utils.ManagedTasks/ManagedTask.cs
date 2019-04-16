@@ -148,11 +148,6 @@ namespace Dexih.Utils.ManagedTasks
         [JsonIgnore]
         public Func<ManagedTask, DateTime, CancellationToken, Task> ScheduleAction { get; set; }
 
-        /// <summary>
-        /// Action that will be started when a cancel is requested.
-        /// </summary>
-        [JsonIgnore]
-        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
 
         private readonly CancellationTokenSource _cancellationTokenSource;
         
@@ -218,6 +213,10 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         public bool Schedule()
         {
+            if (Status == EManagedTaskStatus.Cancelled)
+            {
+                return false;
+            }
            
             if(Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
             {
@@ -432,18 +431,19 @@ namespace Dexih.Utils.ManagedTasks
 
         public  void Cancel()
         {
-            _cancellationTokenSource.Cancel();
-            
-            if (Status == EManagedTaskStatus.Scheduled)
-            {
-                CancelScheduleAction?.Invoke(this, CancellationToken.None);
-            }
-
-            Success = false;
-            Message = "The task was cancelled.";
-            SetStatus(EManagedTaskStatus.Cancelled);
             DisposeSchedules();
             DisposeTrigger();
+
+            if (Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
+            {
+                SetStatus(EManagedTaskStatus.Cancelled);
+            }
+            
+            _cancellationTokenSource.Cancel();
+
+//            Success = false;
+//            Message = "The task was cancelled.";
+//            SetStatus(EManagedTaskStatus.Cancelled);
         }
 
         public void Error(string message, Exception ex)

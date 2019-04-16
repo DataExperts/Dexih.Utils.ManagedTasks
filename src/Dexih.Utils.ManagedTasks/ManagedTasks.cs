@@ -55,6 +55,7 @@ namespace Dexih.Utils.ManagedTasks
 
 		private readonly object _taskAddLock = 1;
 		private readonly object _triggerLock = 1;
+		private readonly object _statusChange = 1;
 		
 		public ManagedTasks(int maxConcurrent = 100)
 		{
@@ -98,17 +99,18 @@ namespace Dexih.Utils.ManagedTasks
 				}
 			}
 
+			managedTask.OnStatus += StatusChange;
+			managedTask.OnProgress += ProgressChanged;
+
 			if (!_activeTasks.TryAdd(managedTask.Reference, managedTask))
 			{
 				throw new ManagedTaskException(managedTask, "Failed to add the task to the active tasks list.");
 			}
-			
-			managedTask.OnStatus += StatusChange;
-            managedTask.OnProgress += ProgressChanged;
 
 			// if there are no dependencies, put the task immediately on the queue.
 			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
-			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()))
+			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
+			    (managedTask.DependentReferences ==null || !managedTask.DependentReferences.Any()))
 			{
 				Start(managedTask.Reference);
 			}
@@ -220,7 +222,7 @@ namespace Dexih.Utils.ManagedTasks
 				Action = action,
 				Triggers = triggers,
 				FileWatchers = fileWatchers,
-				DependentReferences = dependentReferences,
+				DependentReferences = dependentReferences
 			};
 
 			return Add(managedTask);
@@ -228,97 +230,104 @@ namespace Dexih.Utils.ManagedTasks
 
 		private void StatusChange(object sender, EManagedTaskStatus newStatus)
 		{
-			try
+			lock (_statusChange)
 			{
-				var managedTask = (ManagedTask)sender;
-				
-				if (newStatus == managedTask.Status) return;
 
-				var oldStatus = managedTask.Status;
-				managedTask.Status = newStatus;
-
-				//store most recent update
-                _taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask );
-
-				switch (newStatus)
+				try
 				{
-					case EManagedTaskStatus.Created:
-						Interlocked.Increment(ref _createdCount);
-						break;
-					case EManagedTaskStatus.FileWatching:
-						Interlocked.Increment(ref _fileWatchCount);
-						break;
-					case EManagedTaskStatus.Scheduled:
-						Interlocked.Increment(ref _scheduledCount);
-						break;
-					case EManagedTaskStatus.Queued:
-						Interlocked.Increment(ref _queuedCount);
-						break;
-					case EManagedTaskStatus.Running:
-						Interlocked.Increment(ref _runningCount);
-						break;
-					case EManagedTaskStatus.Completed:
-						Interlocked.Increment(ref _completedCount);
-						break;
-					case EManagedTaskStatus.Error:
-						Interlocked.Increment(ref _errorCount);
-						break;
-					case EManagedTaskStatus.Cancelled:
-						Interlocked.Increment(ref _cancelCount);
-						break;
-				}
+					var managedTask = (ManagedTask) sender;
 
-				// if the status is finished update the queues
-				if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled || newStatus == EManagedTaskStatus.Error)
-				{
-					if (oldStatus == EManagedTaskStatus.Running)
-					{
-						if (!_runningTasks.TryRemove(managedTask.Reference, out var _))
-						{
-							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the running tasks list.");
-							SetException(_exitException);
-							return;
-						}
-					}
-					
-					if (oldStatus == EManagedTaskStatus.Scheduled)
-					{
-						if (!_scheduledTasks.TryRemove(managedTask.Reference, out var _))
-						{
-							_exitException = new ManagedTaskException(managedTask, "Failed to remove the task from the scheduled tasks list.");
-							SetException(_exitException);
-							return;
-						}
-					}
-					
-					UpdateRunningQueue();
+					if (newStatus == managedTask.Status) return;
 
-					if (newStatus == EManagedTaskStatus.Cancelled)
+					var oldStatus = managedTask.Status;
+					managedTask.Status = newStatus;
+
+					//store most recent update
+					_taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask,
+						(oldKey, oldValue) => managedTask);
+
+					switch (newStatus)
 					{
-						if (!_activeTasks.TryRemove(managedTask.Reference, out var _))
+						case EManagedTaskStatus.Created:
+							Interlocked.Increment(ref _createdCount);
+							break;
+						case EManagedTaskStatus.FileWatching:
+							Interlocked.Increment(ref _fileWatchCount);
+							break;
+						case EManagedTaskStatus.Scheduled:
+							Interlocked.Increment(ref _scheduledCount);
+							break;
+						case EManagedTaskStatus.Queued:
+							Interlocked.Increment(ref _queuedCount);
+							break;
+						case EManagedTaskStatus.Running:
+							Interlocked.Increment(ref _runningCount);
+							break;
+						case EManagedTaskStatus.Completed:
+							Interlocked.Increment(ref _completedCount);
+							break;
+						case EManagedTaskStatus.Error:
+							Interlocked.Increment(ref _errorCount);
+							break;
+						case EManagedTaskStatus.Cancelled:
+							Interlocked.Increment(ref _cancelCount);
+							break;
+					}
+
+					// if the status is finished update the queues
+					if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled ||
+					    newStatus == EManagedTaskStatus.Error)
+					{
+						if (oldStatus == EManagedTaskStatus.Running)
 						{
-							_exitException = new ManagedTaskException(managedTask, "Failed to remove the cancelled task from the active tasks list.");
-							SetException(_exitException);
-							return;
+							if (!_runningTasks.TryRemove(managedTask.Reference, out var _))
+							{
+								_exitException = new ManagedTaskException(managedTask,
+									"Failed to remove the task from the running tasks list.");
+								SetException(_exitException);
+								return;
+							}
 						}
+
+						if (oldStatus == EManagedTaskStatus.Scheduled || oldStatus == EManagedTaskStatus.FileWatching)
+						{
+							if (!_scheduledTasks.TryRemove(managedTask.Reference, out var _))
+							{
+								_exitException = new ManagedTaskException(managedTask,
+									"Failed to remove the task from the scheduled tasks list.");
+								SetException(_exitException);
+								return;
+							}
+						}
+
+						UpdateRunningQueue();
+
+//						if (newStatus == EManagedTaskStatus.Cancelled)
+//						{
+//							if (!_activeTasks.TryRemove(managedTask.Reference, out var _))
+//							{
+//								_exitException = new ManagedTaskException(managedTask,
+//									"Failed to remove the cancelled task from the active tasks list.");
+//								SetException(_exitException);
+//								return;
+//							}
+//						}
+
+						ReStartTask(managedTask);
+						OnStatus?.Invoke(sender, newStatus);
+
 					}
 					else
 					{
-						ReStartTask(managedTask);
+						OnStatus?.Invoke(sender, newStatus);
 					}
-					OnStatus?.Invoke(sender, newStatus);
 
 				}
-				else
+				catch (Exception ex)
 				{
-					OnStatus?.Invoke(sender, newStatus);
+					_exitException = ex;
+					SetException(_exitException);
 				}
-
-			}
-			catch (Exception ex)
-			{
-				_exitException = ex;
-				SetException(_exitException);
 			}
 		}
 
@@ -434,11 +443,6 @@ namespace Dexih.Utils.ManagedTasks
                     queuedTask.Start();
                 }
 
-                // if there are no remaining tasks, set the trigger to allow WhenAll to run.
-//                if (_runningTasks.Count == 0 && _queuedTasks.Count == 0 && _scheduledTasks.Count == 0)
-//                {
-//                    _noMoreTasks.TrySetResult(true);
-//                }
             }
         }
 
@@ -517,6 +521,7 @@ namespace Dexih.Utils.ManagedTasks
 			OnProgress?.Invoke(sender, progress);
 		}
 		
+		
 	   private void Trigger(object sender, EventArgs e)
         {
             lock (_triggerLock)
@@ -537,7 +542,7 @@ namespace Dexih.Utils.ManagedTasks
 			var awaitTask = new TaskCompletionSource<bool>(false);
 			_awaitTasks.Enqueue(awaitTask);
 
-			while (_activeTasks.Count > 0 || _resetRunningCount > 0)
+			while (_activeTasks.Count > 0 || _runningTasks.Count > 0 || _resetRunningCount > 0)
 			{
 				await Task.WhenAny(awaitTask.Task, Task.Delay(-1, cancellationToken));
 

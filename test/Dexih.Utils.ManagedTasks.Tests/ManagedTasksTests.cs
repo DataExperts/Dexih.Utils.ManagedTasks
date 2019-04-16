@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -338,6 +339,7 @@ namespace dexih.functions.tests
 
                 Assert.Equal(taskCount, startedTaskCount);
 
+                _output.WriteLine($"Error count {errorCount}, error count in tasks {managedTasks.ErrorCount}");
                 // all error counters should equal the number of tasks
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
                 Assert.Equal(taskCount, errorCount);
@@ -357,14 +359,14 @@ namespace dexih.functions.tests
             // simple task that can be cancelled
             async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
             {
-                try
-                {
-                    await Task.Delay(10000, cancellationToken);
-                } catch(Exception ex)
-                {
-                    _output.WriteLine(ex.Message);
-                }
-                _output.WriteLine("cancelled");
+                await Task.Delay(10000, cancellationToken);
+//                try
+//                {
+//                } catch(Exception ex)
+//                {
+//                    _output.WriteLine(ex.Message);
+//                }
+//                _output.WriteLine("cancelled");
             }
 
             // add the simple task 500 times.
@@ -416,7 +418,7 @@ namespace dexih.functions.tests
                 await Task.Delay(5000, cancellationToken);
             }
 
-            var startDate = DateTime.Now;
+            var timer = Stopwatch.StartNew();
 
             // run task1, then task2, then task 3 
             var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
@@ -428,7 +430,7 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
             
             // job should take 15 seconds.
-            Assert.True(startDate.AddSeconds(15) < DateTime.Now && startDate.AddSeconds(16) > DateTime.Now);
+            Assert.True(timer.Elapsed.Seconds >= 15 && timer.Elapsed.Seconds <= 16, $"Took {timer.Elapsed.Seconds} should take 15 seconds.");
         }
 
         [Fact]
@@ -442,7 +444,7 @@ namespace dexih.functions.tests
                 await Task.Delay(5000, cancellationToken);
             }
 
-            var startDate = DateTime.Now;
+            var timer = Stopwatch.StartNew();
 
             // run task1 & task2 parallel, then task 3 when both finish
             var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
@@ -454,8 +456,8 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
 
 
-            // job should take about 10 seconds
-            Assert.True(startDate.AddSeconds(10) < DateTime.Now && startDate.AddSeconds(11) > DateTime.Now);
+            // job should take 10 seconds.
+            Assert.True(timer.Elapsed.Seconds >= 10 && timer.Elapsed.Seconds <= 11, $"Took {timer.Elapsed.Seconds} should take 10 seconds.");
         }
 
         [Fact]
@@ -487,7 +489,7 @@ namespace dexih.functions.tests
             cts.CancelAfter(30000);
             await managedTasks.WhenAll(cts.Token);
 
-            // time should be startdate + 5 second for the job to run.
+            // time should be startDate + 5 second for the job to run.
             Assert.True(trigger.StartDate.Value.AddSeconds(5) < DateTime.Now);
         }
 
@@ -538,7 +540,7 @@ namespace dexih.functions.tests
             Assert.Equal(5, managedTasks.CompletedCount);
 
             // 10 seconds = Initial 1 + 2 *(5-1) recurs + 1 final job
-            Assert.True(trigger.StartDate.Value.AddSeconds(10) < DateTime.Now);
+            Assert.True(trigger.StartDate.Value.AddSeconds(10) <= DateTime.Now);
         }
 
         
