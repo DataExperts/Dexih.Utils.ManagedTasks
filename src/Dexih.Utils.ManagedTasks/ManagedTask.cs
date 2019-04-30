@@ -148,7 +148,12 @@ namespace Dexih.Utils.ManagedTasks
         [JsonIgnore]
         public Func<ManagedTask, DateTime, CancellationToken, Task> ScheduleAction { get; set; }
 
-
+        /// <summary>
+        /// Action that will be started when a cancel is requested.
+        /// </summary>
+        [JsonIgnore]
+        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
+        
         private readonly CancellationTokenSource _cancellationTokenSource;
         
         private Task _task;
@@ -436,6 +441,7 @@ namespace Dexih.Utils.ManagedTasks
 
             if (Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
             {
+                CancelScheduleAction?.Invoke(this, CancellationToken.None);
                 SetStatus(EManagedTaskStatus.Cancelled);
             }
             
