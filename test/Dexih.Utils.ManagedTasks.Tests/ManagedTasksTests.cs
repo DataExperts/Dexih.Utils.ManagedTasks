@@ -657,7 +657,7 @@ namespace dexih.functions.tests
             cts.CancelAfter(10000);
             await managedTasks.WhenAll(cts.Token);
 
-            // filewatch count will be 6.  One for each file (5), and then another for the next watcher that was started before the cancel.
+            // file watch count will be 6.  One for each file (5), and then another for the next watcher that was started before the cancel.
             Assert.Equal(6, fileWatchCount);
             Assert.Equal(6, managedTasks.FileWatchCount);
 
