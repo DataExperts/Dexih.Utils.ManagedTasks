@@ -266,14 +266,10 @@ namespace Dexih.Utils.ManagedTasks
                 {
                     allowSchedule = true;
 
-                    SetStatus(EManagedTaskStatus.Scheduled);
-                    
                     StepName = "Scheduled...";
                     Percentage = 0;
                     Counter = 0;
                     
-                    OnSchedule?.Invoke(this, EventArgs.Empty);
-
                     var timeToGo = startAt.Value - DateTime.Now;
 
                     if (timeToGo > TimeSpan.Zero)
@@ -288,6 +284,9 @@ namespace Dexih.Utils.ManagedTasks
                     {
                         TriggerReady(startTrigger);
                     }
+                    
+                    SetStatus(EManagedTaskStatus.Scheduled);
+                    OnSchedule?.Invoke(this, EventArgs.Empty);
                 }
             }
 
