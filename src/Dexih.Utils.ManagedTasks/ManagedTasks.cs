@@ -9,10 +9,11 @@ using System.Threading.Tasks;
 
 namespace Dexih.Utils.ManagedTasks
 {
+	
 	/// <summary>
 	/// Collection of managed tasks.
 	/// </summary>
-	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable
+	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable, IManagedTasks
 	{
 		public event EventHandler<EManagedTaskStatus> OnStatus;
 		public event EventHandler<ManagedTaskProgressItem> OnProgress;

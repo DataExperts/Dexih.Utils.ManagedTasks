@@ -118,7 +118,7 @@ namespace Dexih.Utils.ManagedTasks
 
         public DateTime? NextTriggerTime { get; set; }
 
-        public int RunCount { get; protected set; }
+        public int RunCount { get; private set; }
 
         /// <summary>
         /// Array of task reference which must be complete prior to this task.
