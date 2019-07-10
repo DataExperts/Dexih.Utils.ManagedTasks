@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,12 +60,8 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         public DateTime LastUpdate { get; set; }
 
-        public EManagedTaskStatus Status { get; set; }
 
-        /// <summary>
-        /// Any data package to include with the task.
-        /// </summary>
-        public object Data { get; set; }
+        public EManagedTaskStatus Status { get; set; }
 
         /// <summary>
         /// Any category that is used to group tasks
@@ -112,6 +106,9 @@ namespace Dexih.Utils.ManagedTasks
         
         public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
 
+        public DateTime StartTime { get; private set; }
+        public DateTime EndTime { get; private set; }
+
         public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
         
         public IEnumerable<ManagedTaskFileWatcher> FileWatchers { get; set; }
@@ -135,24 +132,29 @@ namespace Dexih.Utils.ManagedTasks
             get => _dependenciesMet || DependentReferences == null || DependentReferences.Length == 0;
             set => _dependenciesMet = value;
         }
-
+        
         /// <summary>
-        /// Action that will be started and executed when the task starts.
+        /// The implementation of the task being run
         /// </summary>
-        [JsonIgnore]
-        public Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> Action { get; set; }
+        public IManagedObject ManagedObject { get; set; }
 
-        /// <summary>
-        /// Action that will be started and executed when the schedule starts.
-        /// </summary>
-        [JsonIgnore]
-        public Func<ManagedTask, DateTime, CancellationToken, Task> ScheduleAction { get; set; }
-
-        /// <summary>
-        /// Action that will be started when a cancel is requested.
-        /// </summary>
-        [JsonIgnore]
-        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
+//        /// <summary>
+//        /// Action that will be started and executed when the task starts.
+//        /// </summary>
+//        [JsonIgnore]
+//        public Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> Action { get; set; }
+//
+//        /// <summary>
+//        /// Action that will be started and executed when the schedule starts.
+//        /// </summary>
+//        [JsonIgnore]
+//        public Action<ManagedTask, DateTime, CancellationToken> ScheduleAction { get; set; }
+//
+//        /// <summary>
+//        /// Action that will be started when a cancel is requested.
+//        /// </summary>
+//        [JsonIgnore]
+//        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
         
         private readonly CancellationTokenSource _cancellationTokenSource;
         
@@ -216,7 +218,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// Start task schedule based on the "Triggers".
         /// </summary>
-        public bool Schedule()
+        public async  Task<bool> Schedule()
         {
             if (Status == EManagedTaskStatus.Cancelled)
             {
@@ -275,7 +277,7 @@ namespace Dexih.Utils.ManagedTasks
                     if (timeToGo > TimeSpan.Zero)
                     {
                         NextTriggerTime = startAt;
-                        ScheduleAction?.Invoke(this, startAt.Value, _cancellationTokenSource.Token);
+                        await ManagedObject.Schedule(startAt.Value, _cancellationTokenSource.Token);
                         
                         //add a schedule.
                         _timer = new Timer(x => TriggerReady(startTrigger), null, timeToGo, Timeout.InfiniteTimeSpan);
@@ -387,50 +389,92 @@ namespace Dexih.Utils.ManagedTasks
                 return;
             }
 
-            _task = Task.Run(async () =>
+//            _task = Task.Run(async () =>
+//            {
+//                try
+//                {
+//                    SetStatus(EManagedTaskStatus.Running);
+//
+//                    try
+//                    {
+//                        await Action(this, _progress, _cancellationTokenSource.Token);
+//                    }
+//                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
+//                    {
+//                        Success = false;
+//                        Message = "The task was cancelled.";
+//                        SetStatus(EManagedTaskStatus.Cancelled);
+//                        Percentage = 100;
+//                        return;
+//                    }
+//
+//                    if (_cancellationTokenSource.IsCancellationRequested)
+//                    {
+//                        Success = false;
+//                        Message = "The task was cancelled.";
+//                        SetStatus(EManagedTaskStatus.Cancelled);
+//                    }
+//                    else
+//                    {
+//                        Success = true;
+//                        Message = "The task completed.";
+//                        SetStatus(EManagedTaskStatus.Completed);
+//                    }
+//
+//                    Percentage = 100;
+//                }
+//                catch (Exception ex)
+//                {
+//                    Message = ex.Message;
+//                    Exception = ex;
+//                    Success = false;
+//                    SetStatus(EManagedTaskStatus.Error);
+//                    Percentage = 100;
+//                }
+
+            SetStatus(EManagedTaskStatus.Running);
+
+            try
             {
-                try
-                {
-                    SetStatus(EManagedTaskStatus.Running);
-
-                    try
+                StartTime = DateTime.Now;
+                _task = ManagedObject.Start(_progress, _cancellationTokenSource.Token)
+                    .ContinueWith((o) =>
                     {
-                        await Action(this, _progress, _cancellationTokenSource.Token);
-                    }
-                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
-                    {
-                        Success = false;
-                        Message = "The task was cancelled.";
-                        SetStatus(EManagedTaskStatus.Cancelled);
-                        Percentage = 100;
-                        return;
-                    }
+                        EndTime = DateTime.Now;
+                        if (o.IsCanceled || o.IsFaulted &&
+                            (o.Exception is OperationCanceledException || o.Exception is TaskCanceledException))
+                        {
+                            Success = false;
+                            Message = "The task was cancelled.";
+                            SetStatus(EManagedTaskStatus.Cancelled);
+                        }
 
-                    if (_cancellationTokenSource.IsCancellationRequested)
-                    {
-                        Success = false;
-                        Message = "The task was cancelled.";
-                        SetStatus(EManagedTaskStatus.Cancelled);
-                    }
-                    else
-                    {
-                        Success = true;
-                        Message = "The task completed.";
-                        SetStatus(EManagedTaskStatus.Completed);
-                    }
+                        else if (o.IsFaulted)
+                        {
+                            Message = o.Exception.Message;
+                            Exception = o.Exception;
+                            Success = false;
+                            SetStatus(EManagedTaskStatus.Error);
+                            Percentage = 100;
+                        }
 
-                    Percentage = 100;
-                }
-                catch (Exception ex)
-                {
-                    Message = ex.Message;
-                    Exception = ex;
-                    Success = false;
-                    SetStatus(EManagedTaskStatus.Error);
-                    Percentage = 100;
-                }
-
-            }); //.ContinueWith((o) => Dispose());
+                        else if (o.IsCompleted)
+                        {
+                            Success = true;
+                            Message = "The task completed.";
+                            SetStatus(EManagedTaskStatus.Completed);
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                EndTime = DateTime.Now;
+                Message = ex.Message;
+                Exception = ex;
+                Success = false;
+                SetStatus(EManagedTaskStatus.Error);
+                Percentage = 100;
+            }
         }
 
         public  void Cancel()
@@ -440,7 +484,7 @@ namespace Dexih.Utils.ManagedTasks
 
             if (Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
             {
-                CancelScheduleAction?.Invoke(this, CancellationToken.None);
+                ManagedObject.Cancel();
                 SetStatus(EManagedTaskStatus.Cancelled);
             }
             
@@ -475,6 +519,7 @@ namespace Dexih.Utils.ManagedTasks
             OnTrigger = null;
             OnSchedule = null;
             OnFileWatch = null;
+            ManagedObject.Dispose();
         }
 
         private string _exceptionDetails;

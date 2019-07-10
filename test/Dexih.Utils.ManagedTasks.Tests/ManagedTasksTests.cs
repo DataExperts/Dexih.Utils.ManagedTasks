@@ -35,16 +35,36 @@ namespace dexih.functions.tests
             _output.WriteLine($"Error tasks count: {managedTasks.ErrorCount }");
         }
 
+        private class ProgressTask : ManagedObject
+        {
+            public ProgressTask(int delay, int loops)
+            {
+                _delay = delay;
+                _loops = loops;
+            }
+
+            private readonly int _delay;
+            private readonly int _loops;
+            
+            public override async Task Start(ManagedTaskProgress progress, CancellationToken cancellationToken = default)
+            {
+                for (var i = 0; i < _loops; i++)
+                {
+                    await Task.Delay(_delay, cancellationToken);
+                    var percent = (i+1) *(100 / _loops);
+                    progress.Report(percent, "step: " + percent);
+                }
+            }
+        }
+
         [Theory]
         [InlineData(2000)]
         public async Task ParallelManagedTaskHandlerConcurrent(int taskCount)
         {
             var managedTasks = new ManagedTasks();
 
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(1);
-            }
+
+            var oneSecondTask = new ProgressTask(1, 1);
 
             for (var i = 0; i < taskCount; i++)
             {
@@ -54,9 +74,9 @@ namespace dexih.functions.tests
                     CategoryKey = i,
                     Name = "task",
                     Category = "123",
-                    Action = Action
+                    ManagedObject = oneSecondTask
                 };
-                managedTasks.Add(task);
+                await managedTasks.Add(task);
             }
 
             var cts = new CancellationTokenSource();
@@ -67,31 +87,26 @@ namespace dexih.functions.tests
             
             Assert.Equal(taskCount, managedTasks.CompletedCount);
         }
+        
+
 
         [Fact]
         public async Task Test_1ManagedTask()
         {
             var managedTasks = new ManagedTasks();
 
-            // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                for (var i = 0; i <= 5; i++)
-                {
-                    await Task.Delay(20, cancellationToken);
-                    progress.Report(i * 20, "step:" + (i*20));
-                }
-            }
 
             _progressCounter = 0;
             managedTasks.OnProgress += Progress;
-            var task1 = managedTasks.Add("123", "task", "test", "object", Action, null);
+            
+            var progressTask = new ProgressTask(20, 5);
+            
+            var task1 = await managedTasks.Add("123", "task", "test", progressTask, null);
 
             //check properties are set correctly.
             Assert.Equal("123", task1.OriginatorId);
             Assert.Equal("task", task1.Name);
             Assert.Equal("test", task1.Category);
-            Assert.Equal("object", task1.Data);
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -108,7 +123,7 @@ namespace dexih.functions.tests
         void Progress(object sender, ManagedTaskProgressItem progressItem)
         {
             Assert.True(progressItem.Percentage > _progressCounter);
-            Assert.Equal(progressItem.StepName, "step:" + progressItem.Percentage);
+            Assert.Equal(progressItem.StepName, "step: " + progressItem.Percentage);
             _progressCounter = progressItem.Percentage;
         }
 
@@ -117,22 +132,14 @@ namespace dexih.functions.tests
         {
             var managedTasks = new ManagedTasks();
 
-            // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                for (var i = 0; i <= 5; i++)
-                {
-                    await Task.Delay(20, cancellationToken);
-                    progress.Report(i * 20);
-                }
-            }
+            var progressTask = new ProgressTask(200 ,5);
 
-            var task1 = managedTasks.Add("123", "task", "test","category", 1, "id", 1, "object", Action, null, null, null);
+            var task1 = await managedTasks.Add("123", "task", "test","category", 1, "id", 1, progressTask, null, null, null);
 
             //adding the same task when running should result in error.
-            Assert.Throws(typeof(ManagedTaskException), () =>
+            Assert.ThrowsAsync(typeof(ManagedTaskException),  async () =>
             {
-                var task2 = managedTasks.Add("123", "task", "test", "category", 1, "id", 1, "object", Action, null, null, null);
+                var task2 = await managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask, null, null, null);
             });
 
             var cts = new CancellationTokenSource();
@@ -140,10 +147,11 @@ namespace dexih.functions.tests
             await managedTasks.WhenAll(cts.Token);
 
             // add the same task again now the previous one has finished.
-            var task3 = managedTasks.Add("123", "task", "test", "category", 1, "id", 1, "object", Action, null, null, null);
+            var task3 = await managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask, null, null, null);
 
             Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
         }
+        
 
         /// <summary>
         /// Adds two tasks using the sequence action, and checks parallel, and sequential running.
@@ -155,22 +163,6 @@ namespace dexih.functions.tests
         public async Task Test_Add_SameTask_Actions(EConcurrentTaskAction concurrentTaskAction, EManagedTaskStatus status)
         {
             var managedTasks = new ManagedTasks();
-            var reference = 0;
-            
-            // add a series of tasks with various delays to ensure the task manager is running.
-            async Task Action1(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(20, cancellationToken); //small delay, means second task will increment first when parallel run, and second when sequential run
-                Interlocked.Increment(ref reference);
-                Assert.Equal(reference, managedTask.ReferenceKey);
-            }
-
-            Task Action2(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                Interlocked.Increment(ref reference);
-                Assert.Equal(reference, managedTask.ReferenceKey);
-                return Task.CompletedTask;
-            }
             
             var task1 = new ManagedTask
             {
@@ -181,8 +173,7 @@ namespace dexih.functions.tests
                 CategoryKey = 1,
                 ReferenceKey = 1,
                 ReferenceId = "id",
-                Data = "object",
-                Action = Action1,
+                ManagedObject =  new ProgressTask(20, 1),
                 Triggers = null,
                 FileWatchers = null,
                 DependentReferences = null,
@@ -198,21 +189,28 @@ namespace dexih.functions.tests
                 CategoryKey = 1,
                 ReferenceKey = 2,
                 ReferenceId = "id",
-                Data = "object",
-                Action = Action2,
+                ManagedObject =  new ProgressTask(0, 1),
                 Triggers = null,
                 FileWatchers = null,
                 DependentReferences = null,
                 ConcurrentTaskAction = concurrentTaskAction
             };
 
-            managedTasks.Add(task1);
-            managedTasks.Add(task2);
+            await managedTasks.Add(task1);
+            await managedTasks.Add(task2);
 
             await managedTasks.WhenAll();
+
+            if (concurrentTaskAction == EConcurrentTaskAction.Parallel)
+            {
+                Assert.True(task1.EndTime > task2.EndTime);                
+            }
+            else
+            {
+                Assert.True(task1.EndTime < task2.EndTime);
+            }
             
-            Assert.Equal(status, task2.Status);
-            Assert.Equal(2, reference);
+            Assert.Equal(2, managedTasks.ErrorCount + managedTasks.CompletedCount);
 
         }
 
@@ -252,22 +250,14 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
             managedTasks.OnStatus += CompletedCounter;
 
-            // simple task reports progress 10 times.
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                for (var i = 0; i < 10; i++)
-                {
-                    await Task.Delay(20, cancellationToken);
-                    progress.Report(i * 10);
-                }
-            }
+            var managedObject = new ProgressTask(20, 10); 
 
             completedCounter = 0;
 
             // add the simple task 100 times.
             for (var i = 0; i < taskCount; i++)
             {
-                managedTasks.Add("123", "task3", "test", 0 , "id", i, null, Action, null, null);
+                await managedTasks.Add("123", "task3", "test", 0 , "id", i, managedObject, null, null);
             }
 
             // use cancellation token to ensure test doesn't get stuck forever.
@@ -296,6 +286,14 @@ namespace dexih.functions.tests
             }
         }
 
+        private class ErrorTask : ManagedObject
+        {
+            public override Task Start(ManagedTaskProgress progress, CancellationToken cancellationToken = default)
+            {
+                throw new Exception("An error");
+            }
+        }
+
         [Theory]
         [InlineData(2)]
         [InlineData(500)]
@@ -303,15 +301,9 @@ namespace dexih.functions.tests
         {
             using (var managedTasks = new ManagedTasks())
             {
-                var startedTaskCount = 0;
                 var errorCount = 0;
 
-                // task throws an error.
-                async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-                {
-                    Interlocked.Increment(ref startedTaskCount);
-                    await Task.Run(() => throw new Exception("An error"));
-                }
+                var managedTask = new ErrorTask();
                 
                 void ErrorResult(object sender, EManagedTaskStatus status)
                 {
@@ -328,7 +320,7 @@ namespace dexih.functions.tests
 
                 for (var i = 0; i < taskCount; i++)
                 {
-                    managedTasks.Add("123", "task3", "test", null, Action, null);
+                    await managedTasks.Add("123", "task3", "test", managedTask, null);
                 }
 
                 var cts = new CancellationTokenSource();
@@ -336,9 +328,7 @@ namespace dexih.functions.tests
                 await managedTasks.WhenAll(cts.Token);
 
                 PrintManagedTasksCounters(managedTasks);
-
-                Assert.Equal(taskCount, startedTaskCount);
-
+                
                 _output.WriteLine($"Error count {errorCount}, error count in tasks {managedTasks.ErrorCount}");
                 // all error counters should equal the number of tasks
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
@@ -347,9 +337,7 @@ namespace dexih.functions.tests
             }
         }
 
-
-
-
+        
         int _cancelCounter = 0;
         [Fact]
         public async Task Test_ManagedTask_Cancel()
@@ -357,17 +345,7 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that can be cancelled
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(10000, cancellationToken);
-//                try
-//                {
-//                } catch(Exception ex)
-//                {
-//                    _output.WriteLine(ex.Message);
-//                }
-//                _output.WriteLine("cancelled");
-            }
+            var managedObject = new ProgressTask(10000, 1);
 
             // add the simple task 500 times.
             _cancelCounter = 0;
@@ -376,7 +354,7 @@ namespace dexih.functions.tests
             var tasks = new ManagedTask[100];
             for (var i = 0; i < 100; i++)
             {
-                tasks[i] = managedTasks.Add("123", "task3", "test", null, Action, null);
+                tasks[i] = await managedTasks.Add("123", "task3", "test", managedObject, null);
             }
 
             for (var i = 0; i < 100; i++)
@@ -413,17 +391,14 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(5000, cancellationToken);
-            }
+            var managedObject = new ProgressTask(5000, 1);
 
             var timer = Stopwatch.StartNew();
 
             // run task1, then task2, then task 3 
-            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
-            var task2 = managedTasks.Add("123", "task2", "test", null, Action, null, new[] { task1.Reference });
-            var task3 = managedTasks.Add("123", "task3", "test", null, Action, null, new[] { task2.Reference });
+            var task1 = await managedTasks.Add("123", "task1", "test", managedObject, null);
+            var task2 = await managedTasks.Add("123", "task2", "test", managedObject, null, new[] { task1.Reference });
+            var task3 = await managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task2.Reference });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -439,17 +414,14 @@ namespace dexih.functions.tests
             var managedTasks = new ManagedTasks();
 
             // simple task that takes 5 seconds
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(5000, cancellationToken);
-            }
+            var managedObject = new ProgressTask(5000, 1);
 
             var timer = Stopwatch.StartNew();
 
             // run task1 & task2 parallel, then task 3 when both finish
-            var task1 = managedTasks.Add("123", "task1", "test", null, Action, null);
-            var task2 = managedTasks.Add("123", "task2", "test", null, Action, null);
-            var task3 = managedTasks.Add("123", "task3", "test", null, Action, null, new[] { task1.Reference, task2.Reference });
+            var task1 = await managedTasks.Add("123", "task1", "test", managedObject, null);
+            var task2 = await managedTasks.Add("123", "task2", "test", managedObject, null);
+            var task3 = await managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task1.Reference, task2.Reference });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -465,11 +437,8 @@ namespace dexih.functions.tests
         {
             var managedTasks = new ManagedTasks();
 
-            // simple task that takes 5 seconds to run
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                await Task.Delay(5000, cancellationToken);
-            }
+            // simple task that takes 5 seconds
+            var managedObject = new ProgressTask(5000, 1);
             
             var currentDate = DateTime.Now;
 
@@ -483,7 +452,7 @@ namespace dexih.functions.tests
             
             _output.WriteLine($"Time to Start: {trigger.NextOccurrence(DateTime.Now)-DateTime.Now}");
 
-            var task1 = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
+            var task1 = await managedTasks.Add("123", "task3", "test", managedObject, new[] { trigger });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -501,11 +470,7 @@ namespace dexih.functions.tests
             var startTime = DateTime.Now.TimeOfDay;
 
             // simple task that takes 1 second to run
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                _output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime));
-                await Task.Delay(1000, cancellationToken);
-            }
+            var managedObject = new ProgressTask(1000, 1);
             
             var scheduleCount = 0;
             
@@ -528,7 +493,7 @@ namespace dexih.functions.tests
                 MaxRecurs = 5
             };
 
-            managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
+            await managedTasks.Add("123", "task3", "test", managedObject, new[] { trigger });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -553,11 +518,7 @@ namespace dexih.functions.tests
             var startTime = DateTime.Now.TimeOfDay;
 
             // simple task that takes 1 second to run
-            async Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                _output.WriteLine("task started - " + DateTime.Now.TimeOfDay.Subtract(startTime));
-                await Task.Delay(1000, cancellationToken);
-            }
+            var managedObject = new ProgressTask(1000, 1);
             
             var scheduleCount = 0;
             
@@ -580,7 +541,7 @@ namespace dexih.functions.tests
                 MaxRecurs = 5
             };
 
-            var task = managedTasks.Add("123", "task3", "test", null, Action, new[] { trigger });
+            var task = await managedTasks.Add("123", "task3", "test", managedObject, new[] { trigger });
 
             Assert.Equal(1, managedTasks.GetScheduledTasks().Count());
 
@@ -589,6 +550,25 @@ namespace dexih.functions.tests
             
             Assert.Equal(0,  managedTasks.GetScheduledTasks().Count());
             
+        }
+
+        private class FileDeleteTask : ManagedObject
+        {
+            public FileDeleteTask(string path)
+            {
+                _path = path;
+            }
+
+            private readonly string _path;
+            public override Task Start(ManagedTaskProgress progress, CancellationToken cancellationToken = default)
+            {
+                var files = Directory.GetFiles(_path);
+                foreach (var file in files)
+                {
+                    File.Delete(file);
+                }
+                return Task.CompletedTask;
+            }
         }
         
         [Fact]
@@ -606,18 +586,7 @@ namespace dexih.functions.tests
            
             _output.WriteLine($"Started at {DateTime.Now}.");
 
-            // simple task that deletes the file that was being watched.
-            Task Action(ManagedTask managedTask, ManagedTaskProgress progress, CancellationToken cancellationToken)
-            {
-                _output.WriteLine("task started - " + DateTime.Now);
-                var files = Directory.GetFiles(path);
-                foreach (var file in files)
-                {
-                    _output.WriteLine("delete file - " +file);
-                    File.Delete(file);
-                }
-                return Task.CompletedTask;
-            }
+            var fileDelete = new FileDeleteTask(path);
             
             var fileWatchCount = 0;
             
@@ -638,7 +607,7 @@ namespace dexih.functions.tests
 
             _output.WriteLine($"Step 1a {DateTime.Now}.");
 
-            var fileTask = managedTasks.Add("123", "task3", "test", null, Action, null,  new[] { fileWatch });
+            var fileTask = await managedTasks.Add("123", "task3", "test", fileDelete, null,  new[] { fileWatch });
 
             var startTime2 = DateTime.Now;
 

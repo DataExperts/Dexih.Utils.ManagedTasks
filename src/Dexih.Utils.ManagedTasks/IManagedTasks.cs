@@ -17,19 +17,19 @@ public interface IManagedTasks
 		long CompletedCount { get; }
 		long ErrorCount { get; }
 		long CancelCount { get; }
-		ManagedTask Add(ManagedTask managedTask);
-		ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
-		ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
-		ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers);
-		ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers);
-		ManagedTask Add(string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action);
-		ManagedTask Add(string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
-		ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
-		ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
-		ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers);
-		ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences);
-		ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher);
-		ManagedTask Add(string reference, string originatorId, string name, string category, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action);
+		Task<ManagedTask> Add(ManagedTask managedTask);
+		Task<ManagedTask> Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
+		Task<ManagedTask> Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
+		Task<ManagedTask> Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers);
+		Task<ManagedTask> Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers);
+		Task<ManagedTask> Add(string originatorId, string name, string category, IManagedObject managedObject);
+		Task<ManagedTask> Add(string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
+		Task<ManagedTask> Add(string originatorId, string name, string category, long hubKey, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, IManagedObject managedObject);
 
 		/// <summary>
 		/// Creates & starts a new managed task.
@@ -46,7 +46,7 @@ public interface IManagedTasks
 		/// <param name="fileWatchers"></param>
 		/// <param name="dependentReferences"></param>
 		/// <returns></returns>
-		ManagedTask Add(string reference, string originatorId, string name, string category, long referenceKey, string referenceId, long categoryKey, object data, Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> action, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
+		Task<ManagedTask> Add(string reference, string originatorId, string name, string category, long referenceKey, string referenceId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences);
 
 		Task WhenAll(CancellationToken cancellationToken = default);
 		IEnumerator<ManagedTask> GetEnumerator();
