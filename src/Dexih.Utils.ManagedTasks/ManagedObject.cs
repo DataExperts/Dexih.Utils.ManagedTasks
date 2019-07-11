@@ -24,5 +24,7 @@ namespace Dexih.Utils.ManagedTasks
         {
             return Task.CompletedTask;
         }
+
+        public abstract object Data { get; set; }
     }
 }

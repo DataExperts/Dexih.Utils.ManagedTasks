@@ -22,5 +22,10 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         /// <returns></returns>
         Task Schedule(DateTime startsAt, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Data object which can be used to expose any data the task needs to provide to other processes.
+        /// </summary>
+        object Data { get; set; }
     }
 }

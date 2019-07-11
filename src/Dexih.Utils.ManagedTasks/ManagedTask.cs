@@ -136,7 +136,16 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// The implementation of the task being run
         /// </summary>
+        [JsonIgnore]
         public IManagedObject ManagedObject { get; set; }
+
+        // The data object is used to pass data when the managedTask is serialized.
+        private object _data;
+        public object Data
+        {
+            get => ManagedObject?.Data ?? _data;
+            set => _data = value;
+        }
 
 //        /// <summary>
 //        /// Action that will be started and executed when the task starts.
