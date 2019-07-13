@@ -227,7 +227,7 @@ namespace Dexih.Utils.ManagedTasks
 			return Add(managedTask);
 		}
 
-		private void StatusChange(object sender, EManagedTaskStatus newStatus)
+		private async void StatusChange(object sender, EManagedTaskStatus newStatus)
 		{
 //			lock (_statusChange)
 //			{
@@ -242,7 +242,7 @@ namespace Dexih.Utils.ManagedTasks
 					managedTask.Status = newStatus;
 
 					//store most recent update
-					_taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask,
+					_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask,
 						(oldKey, oldValue) => managedTask);
 
 					switch (newStatus)
@@ -312,7 +312,7 @@ namespace Dexih.Utils.ManagedTasks
 //							}
 //						}
 
-						ReStartTask(managedTask);
+						await ReStartTask(managedTask);
 						OnStatus?.Invoke(sender, newStatus);
 
 					}
@@ -461,9 +461,14 @@ namespace Dexih.Utils.ManagedTasks
         {
           	Interlocked.Increment(ref _resetRunningCount);
 
+            // copy the activeTask so it is preserved when job is rerun to to schedule.
+            var completedTask = managedTask.Copy();
+
 			if (await managedTask.Schedule())
 			{
-				// managedTask.Reset();
+				_taskChangeHistory.AddOrUpdate(completedTask.ChangeId, completedTask, (oldKey, oldValue) => completedTask);
+				managedTask.ResetChangeId();
+
 				Schedule(managedTask.Reference);
 			}
 			else
@@ -481,7 +486,7 @@ namespace Dexih.Utils.ManagedTasks
 						new ManagedTaskException(managedTask, "Failed to remove the task to the active tasks list.");
 					SetException(_exitException);
 				}
-
+				
 				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CategoryKey), activeTask,
 					(oldKey, oldValue) => activeTask);
 			}
@@ -528,7 +533,7 @@ namespace Dexih.Utils.ManagedTasks
 		private void ProgressChanged(object sender, ManagedTaskProgressItem progress)
 		{
 			var managedTask = (ManagedTask)sender;
-			_taskChangeHistory.AddOrUpdate(managedTask.Reference, managedTask, (oldKey, oldValue) => managedTask);
+			_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask, (oldKey, oldValue) => managedTask);
 			OnProgress?.Invoke(sender, progress);
 		}
 		

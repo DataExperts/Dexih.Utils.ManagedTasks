@@ -29,6 +29,12 @@ namespace Dexih.Utils.ManagedTasks
         public event EventHandler OnSchedule;
         public event EventHandler OnFileWatch;
 
+        /// <summary>
+        /// Used to store changes
+        /// </summary>
+        [JsonIgnore]
+        public string ChangeId { get; set; }
+        
         public bool Success { get; set; }
         public string Message { get; set; }
         
@@ -175,7 +181,10 @@ namespace Dexih.Utils.ManagedTasks
         private Timer _timer;
         private readonly object _triggerLock = 1;
 
-        // private Task _eventManager;
+        public void ResetChangeId()
+        {
+            ChangeId = Guid.NewGuid().ToString();
+        }
 
         public ManagedTask()
         {
@@ -183,6 +192,7 @@ namespace Dexih.Utils.ManagedTasks
             LastUpdate = DateTime.Now;
             Status = EManagedTaskStatus.Created;
             _cancellationTokenSource = new CancellationTokenSource();
+            ResetChangeId();
 
             // progress routine which calls the progress event async 
             _progress = new ManagedTaskProgress(value =>
@@ -447,33 +457,27 @@ namespace Dexih.Utils.ManagedTasks
             {
                 StartTime = DateTime.Now;
                 _task = ManagedObject.Start(_progress, _cancellationTokenSource.Token)
-                    .ContinueWith((o) =>
+                    .ContinueWith(o =>
                     {
-                        EndTime = DateTime.Now;
-                        if (o.IsCanceled || o.IsFaulted &&
-                            (o.Exception is OperationCanceledException || o.Exception is TaskCanceledException))
-                        {
-                            Success = false;
-                            Message = "The task was cancelled.";
-                            SetStatus(EManagedTaskStatus.Cancelled);
-                        }
-
-                        else if (o.IsFaulted)
-                        {
-                            Message = o.Exception.Message;
-                            Exception = o.Exception;
-                            Success = false;
-                            SetStatus(EManagedTaskStatus.Error);
-                            Percentage = 100;
-                        }
-
-                        else if (o.IsCompleted)
-                        {
-                            Success = true;
-                            Message = "The task completed.";
-                            SetStatus(EManagedTaskStatus.Completed);
-                        }
-                    });
+                        Success = true;
+                        Message = "The task completed.";
+                        SetStatus(EManagedTaskStatus.Completed);
+                        
+                    }, TaskContinuationOptions.OnlyOnRanToCompletion)
+                    .ContinueWith(o =>
+                    {
+                        Success = false;
+                        Message = "The task was cancelled.";
+                        SetStatus(EManagedTaskStatus.Cancelled);
+                    }, TaskContinuationOptions.OnlyOnCanceled)
+                    .ContinueWith(o =>
+                    {
+                        Message = o.Exception.Message;
+                        Exception = o.Exception;
+                        Success = false;
+                        SetStatus(EManagedTaskStatus.Error);
+                        Percentage = 100;
+                    }, TaskContinuationOptions.OnlyOnFaulted);
             }
             catch (Exception ex)
             {
@@ -565,6 +569,40 @@ namespace Dexih.Utils.ManagedTasks
                 return "";
             }
             set => _exceptionDetails = value;
+        }
+
+        /// <summary>
+        /// Returns a copy of the basic properties
+        /// Excludes runtime properties.
+        /// </summary>
+        /// <returns></returns>
+        public ManagedTask Copy()
+        {
+            return new ManagedTask()
+            {
+                Category = Category,
+                Counter = Counter,
+                Data = Data,
+                Description = Description,
+                Message = Message,
+                Name = Name,
+                Percentage = Percentage,
+                Reference = Reference,
+                Status = Status,
+                Success = Success,
+                CategoryKey = CategoryKey,
+                ChangeId = ChangeId,
+                DependenciesMet = DependenciesMet,
+                EndTime = EndTime,
+                LastUpdate = LastUpdate,
+                OriginatorId = OriginatorId,
+                ReferenceId = ReferenceId,
+                ReferenceKey = ReferenceKey,
+                RunCount = RunCount,
+                StartTime = StartTime,
+                StepName = StepName,
+                ConcurrentTaskAction = ConcurrentTaskAction
+            };
         }
     }
 }
