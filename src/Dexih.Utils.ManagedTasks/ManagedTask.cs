@@ -461,6 +461,7 @@ namespace Dexih.Utils.ManagedTasks
                     {
                         Success = true;
                         Message = "The task completed.";
+                        EndTime = DateTime.Now;
                         SetStatus(EManagedTaskStatus.Completed);
                         
                     }, TaskContinuationOptions.OnlyOnRanToCompletion)
@@ -468,6 +469,7 @@ namespace Dexih.Utils.ManagedTasks
                     {
                         Success = false;
                         Message = "The task was cancelled.";
+                        EndTime = DateTime.Now;
                         SetStatus(EManagedTaskStatus.Cancelled);
                     }, TaskContinuationOptions.OnlyOnCanceled)
                     .ContinueWith(o =>
@@ -475,6 +477,7 @@ namespace Dexih.Utils.ManagedTasks
                         Message = o.Exception.Message;
                         Exception = o.Exception;
                         Success = false;
+                        EndTime = DateTime.Now;
                         SetStatus(EManagedTaskStatus.Error);
                         Percentage = 100;
                     }, TaskContinuationOptions.OnlyOnFaulted);

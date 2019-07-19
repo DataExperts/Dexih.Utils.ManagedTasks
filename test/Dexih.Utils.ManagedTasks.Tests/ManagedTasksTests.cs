@@ -55,6 +55,8 @@ namespace dexih.functions.tests
                     progress.Report(percent, "step: " + percent);
                 }
             }
+
+            public override object Data { get; set; }
         }
 
         [Theory]
@@ -137,7 +139,7 @@ namespace dexih.functions.tests
             var task1 = await managedTasks.Add("123", "task", "test","category", 1, "id", 1, progressTask, null, null, null);
 
             //adding the same task when running should result in error.
-            Assert.ThrowsAsync(typeof(ManagedTaskException),  async () =>
+            await Assert.ThrowsAsync(typeof(ManagedTaskException),  async () =>
             {
                 var task2 = await managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask, null, null, null);
             });
@@ -292,6 +294,8 @@ namespace dexih.functions.tests
             {
                 throw new Exception("An error");
             }
+
+            public override object Data { get; set; }
         }
 
         [Theory]
@@ -569,6 +573,8 @@ namespace dexih.functions.tests
                 }
                 return Task.CompletedTask;
             }
+
+            public override object Data { get; set; }
         }
         
         [Fact]
