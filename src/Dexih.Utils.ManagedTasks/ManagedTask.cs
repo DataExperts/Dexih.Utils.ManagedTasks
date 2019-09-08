@@ -459,28 +459,39 @@ namespace Dexih.Utils.ManagedTasks
                 _task = ManagedObject.Start(_progress, _cancellationTokenSource.Token)
                     .ContinueWith(o =>
                     {
-                        Success = true;
-                        Message = "The task completed.";
-                        EndTime = DateTime.Now;
-                        SetStatus(EManagedTaskStatus.Completed);
-                        
-                    }, TaskContinuationOptions.OnlyOnRanToCompletion)
-                    .ContinueWith(o =>
-                    {
-                        Success = false;
-                        Message = "The task was cancelled.";
-                        EndTime = DateTime.Now;
-                        SetStatus(EManagedTaskStatus.Cancelled);
-                    }, TaskContinuationOptions.OnlyOnCanceled)
-                    .ContinueWith(o =>
-                    {
-                        Message = o.Exception.Message;
-                        Exception = o.Exception;
-                        Success = false;
-                        EndTime = DateTime.Now;
-                        SetStatus(EManagedTaskStatus.Error);
-                        Percentage = 100;
-                    }, TaskContinuationOptions.OnlyOnFaulted);
+                        switch (o.Status)
+                        {
+                            case TaskStatus.RanToCompletion:
+                                Success = true;
+                                Message = "The task completed.";
+                                EndTime = DateTime.Now;
+                                SetStatus(EManagedTaskStatus.Completed);
+                                break;
+                            case TaskStatus.Canceled:
+                                Success = false;
+                                Message = "The task was cancelled.";
+                                EndTime = DateTime.Now;
+                                SetStatus(EManagedTaskStatus.Cancelled);
+                                break;
+                            case TaskStatus.Faulted:
+                                Message = o.Exception?.Message ?? "Unknown error occurred";
+                                Exception = o.Exception;
+                                Success = false;
+                                EndTime = DateTime.Now;
+                                SetStatus(EManagedTaskStatus.Error);
+                                Percentage = 100;
+                                break;
+                            default:
+                                Message = "Task failed with status " + o.Status + ".  Message:" + (o.Exception?.Message??"No Message");
+                                Exception = o.Exception;
+                                Success = false;
+                                EndTime = DateTime.Now;
+                                SetStatus(EManagedTaskStatus.Error);
+                                Percentage = 100;
+                                break;
+                        }
+
+                    });
             }
             catch (Exception ex)
             {
