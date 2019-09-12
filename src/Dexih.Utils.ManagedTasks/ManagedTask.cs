@@ -11,12 +11,12 @@ namespace Dexih.Utils.ManagedTasks
     // [JsonConverter(typeof(StringEnumConverter))]
     public enum EManagedTaskStatus
     {
-        Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
+        Created = 1, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
     }
 
     public enum EConcurrentTaskAction
     {
-        Parallel,
+        Parallel = 1,
         Abend,
         Sequence
     }
