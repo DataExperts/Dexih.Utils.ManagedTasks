@@ -8,7 +8,7 @@ using Newtonsoft.Json.Converters;
 
 namespace Dexih.Utils.ManagedTasks
 {
-    [JsonConverter(typeof(StringEnumConverter))]
+    // [JsonConverter(typeof(StringEnumConverter))]
     public enum EManagedTaskStatus
     {
         Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed

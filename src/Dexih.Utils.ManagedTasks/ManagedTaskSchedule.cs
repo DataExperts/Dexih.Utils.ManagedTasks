@@ -16,7 +16,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// Day of the week
         /// </summary>
-        [JsonConverter(typeof(StringEnumConverter))]
+        // [JsonConverter(typeof(StringEnumConverter))]
         public enum EDayOfWeek
         {
             Sunday = 0,
@@ -28,7 +28,7 @@ namespace Dexih.Utils.ManagedTasks
             Saturday = 6
         }
 
-        [JsonConverter(typeof(StringEnumConverter))]
+        // [JsonConverter(typeof(StringEnumConverter))]
         public enum EIntervalType
         {
             Once,
@@ -37,7 +37,7 @@ namespace Dexih.Utils.ManagedTasks
             Monthly
         }
 
-        [JsonConverter(typeof(StringEnumConverter))]
+        // [JsonConverter(typeof(StringEnumConverter))]
         public enum EWeekOfMonth
         {
             First,
