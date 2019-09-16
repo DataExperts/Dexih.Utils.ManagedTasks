@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.Serialization;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -80,10 +81,16 @@ namespace Dexih.Utils.ManagedTasks
         }
     }
 
+    [DataContract]
     public class ManagedTaskProgressItem
     {
+        [DataMember(Order = 1)]
         public string StepName { get; set; }
+        
+        [DataMember(Order = 2)]
         public int Percentage { get; set; }
+        
+        [DataMember(Order = 3)]
         public long Counter { get; set; }
     }
     

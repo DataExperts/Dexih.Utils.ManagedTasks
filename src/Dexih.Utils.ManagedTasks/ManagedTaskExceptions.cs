@@ -6,13 +6,13 @@ namespace Dexih.Utils.ManagedTasks
     {
         public ManagedTask ManagedTask { get; protected set; }
 
-        public ManagedTaskException(ManagedTask managedTask)
+        public ManagedTaskException()
         {
         }
-        public ManagedTaskException(ManagedTask managedTask, string message) : base(message)
+        public ManagedTaskException(string message) : base(message)
         {
         }
-        public ManagedTaskException(ManagedTask managedTask, string message, Exception innerException) : base(message, innerException)
+        public ManagedTaskException(string message, Exception innerException) : base(message, innerException)
         {
         }
     }

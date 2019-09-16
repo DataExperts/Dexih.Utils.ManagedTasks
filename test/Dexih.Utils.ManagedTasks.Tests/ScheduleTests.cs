@@ -1,20 +1,17 @@
-﻿using Dexih.Utils.ManagedTasks;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
+using Dexih.Utils.ManagedTasks;
 using Xunit;
 using Xunit.Abstractions;
-using static Dexih.Utils.ManagedTasks.ManagedTaskSchedule;
 
-namespace Dexih.Utils.ManagedTasks
+namespace Dexih.Utils.Managed.Tasks.Tests
 {
     public class ScheduleTests
     {
-        private readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper _output;
 
         public ScheduleTests(ITestOutputHelper output)
         {
-            this.output = output;
+            this._output = output;
         }
 
         /// <summary>
@@ -22,9 +19,10 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         /// <param name="expectedTime"></param>
         /// <param name="actualTime"></param>
-        private void TimeTest(DateTime expectedTime, DateTime actualTime, int MillisecondTolerance = 200)
+        /// <param name="millisecondTolerance"></param>
+        private void TimeTest(DateTime expectedTime, DateTime actualTime, int millisecondTolerance = 200)
         {
-            var tolerance = new TimeSpan(0, 0, 0, 0, MillisecondTolerance);
+            var tolerance = new TimeSpan(0, 0, 0, 0, millisecondTolerance);
             var expectedLowTime = expectedTime.Subtract(tolerance);
             var expectedHighTime = expectedTime.Add(tolerance);
             Assert.True(actualTime > expectedLowTime, $"The actual time {actualTime} is less than the expected time {expectedLowTime}.");
@@ -44,8 +42,8 @@ namespace Dexih.Utils.ManagedTasks
             };
 
             var nextSchedule = (DateTime)schedule.NextOccurrence(currentDate);
-            output.WriteLine($"Schedule details {schedule.Details}.");
-            output.WriteLine($"Schedule time {nextSchedule}.");
+            _output.WriteLine($"Schedule details {schedule.Details}.");
+            _output.WriteLine($"Schedule time {nextSchedule}.");
 
             TimeTest(DateTime.Now.AddMinutes(1), nextSchedule);
         }
@@ -64,8 +62,8 @@ namespace Dexih.Utils.ManagedTasks
             };
 
             var nextSchedule = (DateTime)schedule.NextOccurrence(currentDate);
-            output.WriteLine($"Schedule details {schedule.Details}.");
-            output.WriteLine($"Schedule time {nextSchedule}.");
+            _output.WriteLine($"Schedule details {schedule.Details}.");
+            _output.WriteLine($"Schedule time {nextSchedule}.");
 
             TimeTest(DateTime.Now.AddDays(1).AddMinutes(-2), nextSchedule);
         }
@@ -82,7 +80,7 @@ namespace Dexih.Utils.ManagedTasks
             //the schedule once should return null if the startdate is in the past.
             var startDate2 = DateTime.Now.AddHours(-1);
             var schedule2 = new ManagedTaskSchedule(startDate2);
-            output.WriteLine($"Schedule details {schedule.Details}.");
+            _output.WriteLine($"Schedule details {schedule.Details}.");
             Assert.Null(schedule2.NextOccurrence(DateTime.Now));
 
         }

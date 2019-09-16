@@ -14,15 +14,14 @@ namespace Dexih.Utils.ManagedTasks
         {
         }
 
-        public abstract Task Start(ManagedTaskProgress progress, CancellationToken cancellationToken = default);
+        public abstract Task StartAsync(ManagedTaskProgress progress, CancellationToken cancellationToken = default);
 
         public void Cancel()
         {
         }
 
-        public Task Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
+        public void Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
         }
 
         public abstract object Data { get; set; }

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -21,6 +21,7 @@ namespace Dexih.Utils.ManagedTasks
         Sequence
     }
     
+    [DataContract]
     public sealed class ManagedTask: IDisposable
     {
         public event EventHandler<EManagedTaskStatus> OnStatus;
@@ -33,107 +34,135 @@ namespace Dexih.Utils.ManagedTasks
         /// Used to store changes
         /// </summary>
         [JsonIgnore]
+        [IgnoreDataMember]
         public string ChangeId { get; set; }
         
+        [DataMember(Order = 1)]
         public bool Success { get; set; }
+
+        [DataMember(Order = 2)]
         public string Message { get; set; }
         
         [JsonIgnore]
+        [IgnoreDataMember]
         public Exception Exception { get; set; }
 
         /// <summary>
         /// Unique key used to reference the task
         /// </summary>
+        [DataMember(Order = 3)]
         public string Reference { get; set; }
         
         /// <summary>
         /// Id that reference the originating client of the task.
         /// </summary>
+        [DataMember(Order = 4)]
         public string OriginatorId { get; set; }
         
         /// <summary>
         /// Short name for the task.
         /// </summary>
+        [DataMember(Order = 5)]
         public string Name { get; set; }
 
         /// <summary>
         /// A description for the task
         /// </summary>
+        [DataMember(Order = 6)]
         public string Description { get; set; }
         
         /// <summary>
         /// When task was last updated.
         /// </summary>
+        [DataMember(Order = 7)]
         public DateTime LastUpdate { get; set; }
-
-
+        
+        [DataMember(Order = 8)]
         public EManagedTaskStatus Status { get; set; }
 
         /// <summary>
         /// Any category that is used to group tasks
         /// </summary>
+        [DataMember(Order = 9)]
         public string Category { get; set; }
         
         /// <summary>
         /// A unique key for the item within the category.  If attempts are made to add two items with same
         /// category key, an exception will be raised.
         /// </summary>
+        [DataMember(Order = 10)]
 		public long CategoryKey { get; set; }
         
         /// <summary>
         /// A long field that can be used as a reference key to the original object.
         /// </summary>
+        [DataMember(Order = 11)]
         public long ReferenceKey { get; set; }
         
         /// <summary>
         /// A string field that can be used as a reference key to the original object.
         /// </summary>
+        [DataMember(Order = 12)]
         public string ReferenceId { get; set; }
 
         /// <summary>
         /// The percentage completion of the task
         /// </summary>
+        [DataMember(Order = 13)]
         public int Percentage { get; set; }
         
         /// <summary>
         /// A counter used to indicate progress (such as rows processed).
         /// </summary>
+        [DataMember(Order = 14)]
         public long Counter { get; set; }
 
         /// <summary>
         /// Action to take when a task with the same referenceKey is added.
         /// </summary>
+        [DataMember(Order = 15)]
         public EConcurrentTaskAction ConcurrentTaskAction { get; set; } = EConcurrentTaskAction.Abend;
         
         /// <summary>
         /// A string use to include the progress step.
         /// </summary>
+        [DataMember(Order = 16)]
         public string StepName { get; set; }
         
         public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
 
+        [DataMember(Order = 17)]
         public DateTime StartTime { get; private set; }
+        
+        [DataMember(Order = 18)]
         public DateTime EndTime { get; private set; }
 
+        [DataMember(Order = 19)]
         public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
         
+        [DataMember(Order = 20)]
         public IEnumerable<ManagedTaskFileWatcher> FileWatchers { get; set; }
 
+        [DataMember(Order = 21)]
         public DateTime? NextTriggerTime { get; set; }
 
+        [DataMember(Order = 22)]
         public int RunCount { get; private set; }
 
         /// <summary>
         /// Array of task reference which must be complete prior to this task.
         /// </summary>
+        [DataMember(Order = 23)]
         public string[] DependentReferences { get; set; }
 
 
         private bool _dependenciesMet;
+        private Task _startTask;
         
         /// <summary>
         /// Flag to indicate dependent tasks have been completed.
         /// </summary>
+        [DataMember(Order = 24)]
         public bool DependenciesMet {
             get => _dependenciesMet || DependentReferences == null || DependentReferences.Length == 0;
             set => _dependenciesMet = value;
@@ -143,10 +172,13 @@ namespace Dexih.Utils.ManagedTasks
         /// The implementation of the task being run
         /// </summary>
         [JsonIgnore]
+        [IgnoreDataMember]
         public IManagedObject ManagedObject { get; set; }
 
         // The data object is used to pass data when the managedTask is serialized.
         private object _data;
+
+        [DataMember(Order = 25)]
         public object Data
         {
             get => ManagedObject?.Data ?? _data;
@@ -172,8 +204,7 @@ namespace Dexih.Utils.ManagedTasks
 //        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
         
         private readonly CancellationTokenSource _cancellationTokenSource;
-        
-        private Task _task;
+
         private readonly ManagedTaskProgress _progress;
         private Task _progressInvoke;
         private bool _previousTrigger;
@@ -237,7 +268,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// Start task schedule based on the "Triggers".
         /// </summary>
-        public async  Task<bool> Schedule()
+        public bool Schedule()
         {
             if (Status == EManagedTaskStatus.Cancelled)
             {
@@ -246,7 +277,7 @@ namespace Dexih.Utils.ManagedTasks
            
             if(Status == EManagedTaskStatus.Queued || Status == EManagedTaskStatus.Running || Status == EManagedTaskStatus.Scheduled || Status == EManagedTaskStatus.FileWatching)
             {
-                throw new ManagedTaskException(this, "The task cannot be scheduled as the status is already set to " + Status);
+                throw new ManagedTaskException("The task cannot be scheduled as the status is already set to " + Status);
             }
 
             var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DependenciesMet && RunCount == 0;
@@ -272,14 +303,12 @@ namespace Dexih.Utils.ManagedTasks
             {
                 // loop through the triggers to find the one scheduled the soonest.
                 DateTime? startAt = null;
-                ManagedTaskSchedule startTrigger = null;
                 foreach (var trigger in Triggers)
                 {
                     var triggerTime = trigger.NextOccurrence(DateTime.Now);
                     if (triggerTime != null && (startAt == null || triggerTime < startAt))
                     {
                         startAt = triggerTime;
-                        startTrigger = trigger;
                     }
                 }
 
@@ -296,14 +325,14 @@ namespace Dexih.Utils.ManagedTasks
                     if (timeToGo > TimeSpan.Zero)
                     {
                         NextTriggerTime = startAt;
-                        await ManagedObject.Schedule(startAt.Value, _cancellationTokenSource.Token);
+                        ManagedObject.Schedule(startAt.Value, _cancellationTokenSource.Token);
                         
                         //add a schedule.
-                        _timer = new Timer(x => TriggerReady(startTrigger), null, timeToGo, Timeout.InfiniteTimeSpan);
+                        _timer = new Timer(x => TriggerReady(), null, timeToGo, Timeout.InfiniteTimeSpan);
                     }
                     else
                     {
-                        TriggerReady(startTrigger);
+                        TriggerReady();
                     }
                     
                     SetStatus(EManagedTaskStatus.Scheduled);
@@ -357,7 +386,7 @@ namespace Dexih.Utils.ManagedTasks
             } 
         }
         
-        private void TriggerReady(ManagedTaskSchedule trigger)
+        private void TriggerReady()
         {
             lock (_triggerLock) // trigger lock is to avoid double trigger
             {
@@ -389,7 +418,7 @@ namespace Dexih.Utils.ManagedTasks
 
             if(Status == EManagedTaskStatus.Running)
             {
-                throw new ManagedTaskException(this, "Task cannot be started as it is already running.");
+                throw new ManagedTaskException("Task cannot be started as it is already running.");
             }
 
             // kill any active timers.
@@ -407,56 +436,13 @@ namespace Dexih.Utils.ManagedTasks
                 SetStatus(EManagedTaskStatus.Cancelled);
                 return;
             }
-
-//            _task = Task.Run(async () =>
-//            {
-//                try
-//                {
-//                    SetStatus(EManagedTaskStatus.Running);
-//
-//                    try
-//                    {
-//                        await Action(this, _progress, _cancellationTokenSource.Token);
-//                    }
-//                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
-//                    {
-//                        Success = false;
-//                        Message = "The task was cancelled.";
-//                        SetStatus(EManagedTaskStatus.Cancelled);
-//                        Percentage = 100;
-//                        return;
-//                    }
-//
-//                    if (_cancellationTokenSource.IsCancellationRequested)
-//                    {
-//                        Success = false;
-//                        Message = "The task was cancelled.";
-//                        SetStatus(EManagedTaskStatus.Cancelled);
-//                    }
-//                    else
-//                    {
-//                        Success = true;
-//                        Message = "The task completed.";
-//                        SetStatus(EManagedTaskStatus.Completed);
-//                    }
-//
-//                    Percentage = 100;
-//                }
-//                catch (Exception ex)
-//                {
-//                    Message = ex.Message;
-//                    Exception = ex;
-//                    Success = false;
-//                    SetStatus(EManagedTaskStatus.Error);
-//                    Percentage = 100;
-//                }
-
+            
             SetStatus(EManagedTaskStatus.Running);
 
             try
             {
                 StartTime = DateTime.Now;
-                _task = ManagedObject.Start(_progress, _cancellationTokenSource.Token)
+                _startTask = ManagedObject.StartAsync(_progress, _cancellationTokenSource.Token)
                     .ContinueWith(o =>
                     {
                         switch (o.Status)
@@ -491,7 +477,7 @@ namespace Dexih.Utils.ManagedTasks
                                 break;
                         }
 
-                    });
+                    }, TaskScheduler.Default);
             }
             catch (Exception ex)
             {
@@ -504,7 +490,11 @@ namespace Dexih.Utils.ManagedTasks
             }
         }
 
-        public  void Cancel()
+        /// <summary>
+        /// Sends a cancellation request to the task
+        /// </summary>
+        /// <returns></returns>
+        public void Cancel()
         {
             DisposeSchedules();
             DisposeTrigger();
@@ -516,6 +506,22 @@ namespace Dexih.Utils.ManagedTasks
             }
             
             _cancellationTokenSource.Cancel();
+            
+        }
+        
+        /// <summary>
+        /// Sends a cancellation request to the task and waits for the task to finish.
+        /// </summary>
+        /// 
+        /// <returns></returns>
+        public async Task CancelAsync(CancellationToken cancellationToken = default)
+        {
+            Cancel();
+
+            if (_startTask != null)
+            {
+                await Task.Run(() => _startTask, cancellationToken);
+            }
 
 //            Success = false;
 //            Message = "The task was cancelled.";
@@ -547,6 +553,12 @@ namespace Dexih.Utils.ManagedTasks
             OnSchedule = null;
             OnFileWatch = null;
             ManagedObject.Dispose();
+
+            if (_startTask != null)
+            {
+                _startTask.Wait();
+                _startTask.Dispose();
+            }
         }
 
         private string _exceptionDetails;

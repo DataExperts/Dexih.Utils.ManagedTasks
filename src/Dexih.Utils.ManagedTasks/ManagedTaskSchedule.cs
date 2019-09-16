@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -11,6 +10,7 @@ namespace Dexih.Utils.ManagedTasks
     /// The trigger class allows a schedule to be implemented via the parameters.
     /// This can then be called to provide the NextTrigger, which is the next date/time the execution should occur.
     /// </summary>
+    [DataContract]
     public class ManagedTaskSchedule
     {
         /// <summary>
@@ -74,11 +74,13 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// StartDate (note, the time component is ignored, use the <see cref="StartTime"/>)
         /// </summary>
+        [DataMember(Order = 1)]
         public DateTime? StartDate { get; set; }
 
         /// <summary>
         /// EndDate (note, the time component is ignored, use the <see cref="EndTime"/>)
         /// </summary>
+        [DataMember(Order = 2)]
         public DateTime? EndDate { get; set; }
 
         /// <summary>
@@ -88,47 +90,56 @@ namespace Dexih.Utils.ManagedTasks
         /// Daily - Run once on each valid <see cref="DaysOfWeek"/><para/>
         /// Monthly - Run monthly<para/>
         /// </summary>
+        [DataMember(Order = 3)]
         public EIntervalType IntervalType { get; set; } = EIntervalType.Interval;
 
         /// <summary>
         /// Interval time is the duration between the starting times
         /// <para /> Note: this applies to interval schedule only.
         /// </summary>
+        [DataMember(Order = 4)]
         public TimeSpan? IntervalTime { get; set; }
 
         /// <summary>
         /// Days of week is an array of of valid days of the week for the schedule.
         /// </summary>
+        [DataMember(Order = 5)]
         public EDayOfWeek[] DaysOfWeek { get; set; }
 
         /// <summary>
         /// Days of the month is any array of valid days of the month for the schedule. 
         /// </summary>
+        [DataMember(Order = 6)]
         public int[] DaysOfMonth { get; set; }
 
         /// <summary>
         /// Days of the month is any array of valid weeks within a month for the schedule. 
         /// </summary>
+        [DataMember(Order = 7)]
         public EWeekOfMonth[] WeeksOfMonth { get; set; }
 
         /// <summary>
         /// List of specific dates (such as public holidays) that are skipped.
         /// </summary>
+        [DataMember(Order = 8)]
         public DateTime[] SkipDates { get; set; }
 
         /// <summary>
         /// StartTime is the time of the day which the job will start.
         /// </summary>
+        [DataMember(Order = 9)]
         public TimeSpan? StartTime { get; set; }
 
         /// <summary>
         /// EndTime is the last time of the day at job can start.
         /// </summary>
+        [DataMember(Order = 10)]
         public TimeSpan? EndTime { get; set; }
 
         /// <summary>
         /// Maximum number of times the schedule recurs.  If null or -1, this will be infinite.
         /// </summary>
+        [DataMember(Order = 11)]
         public int? MaxRecurs { get; set; }
 
 
@@ -137,6 +148,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <summary>
         /// Gets a description of the trigger.
         /// </summary>
+        [DataMember(Order = 12)]
         public string Details
         {
             get
@@ -301,14 +313,17 @@ namespace Dexih.Utils.ManagedTasks
 
             // loop through and test each date until we find the first valid one.
             var isValidDate = false;
+            var infiniteBreakCounter = 1;
             var currentMonth = nextDate.Month;
-            while (!isValidDate || currentMonth != nextDate.Month)
+            while ((!isValidDate || currentMonth != nextDate.Month) && infiniteBreakCounter < 10000)
             {
                 isValidDate = IsValidDate(nextDate);
                 if(!isValidDate)
                 {
                     nextDate = nextDate.AddDays(1);
                 }
+
+                infiniteBreakCounter++;
             }
 
             if (isValidDate)
@@ -336,13 +351,15 @@ namespace Dexih.Utils.ManagedTasks
             // loop through and test each date until we find the first valid one.
             var isValidDate = false;
             var infiniteBreakCounter = 1;
-            while (!isValidDate || infiniteBreakCounter > 1000)
+            while (!isValidDate && infiniteBreakCounter < 10000)
             {
                 isValidDate = IsValidDate(nextDate);
                 if (!isValidDate)
                 {
                     nextDate = nextDate.AddDays(1);
                 }
+
+                infiniteBreakCounter++;
             }
 
             if (isValidDate)

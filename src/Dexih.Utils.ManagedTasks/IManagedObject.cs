@@ -10,7 +10,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Action to take when task is started.
         /// </summary>
         /// <returns></returns>
-        Task Start(ManagedTaskProgress progress, CancellationToken cancellationToken = default);
+        Task StartAsync(ManagedTaskProgress progress, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Action to take when task is cancelled.
@@ -21,7 +21,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Action to take when task is scheduled.
         /// </summary>
         /// <returns></returns>
-        Task Schedule(DateTime startsAt, CancellationToken cancellationToken = default);
+        void Schedule(DateTime startsAt, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Data object which can be used to expose any data the task needs to provide to other processes.

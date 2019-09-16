@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 
 namespace Dexih.Utils.ManagedTasks
@@ -10,14 +11,19 @@ namespace Dexih.Utils.ManagedTasks
     /// This the base class for watching files.  
     /// This can be overridden, for other file systems.
     /// </summary>
+    [DataContract]
     public class ManagedTaskFileWatcher : IDisposable
     {
         public event EventHandler OnFileWatch;
         
+        [DataMember(Order = 1)]
         public string Path { get; set; }
+        
+        [DataMember(Order = 2)]
         public string Filter { get; set; }
         
-        public bool IsStarted { get; set; } = false;
+        [DataMember(Order = 3)]
+        public bool IsStarted { get; set; }
 
         private FileSystemWatcher _fileSystemWatcher;
         private readonly HashSet<string> _filesProcessed;
