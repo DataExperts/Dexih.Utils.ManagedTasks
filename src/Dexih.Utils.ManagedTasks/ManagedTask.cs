@@ -282,7 +282,7 @@ namespace Dexih.Utils.ManagedTasks
 
             var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DependenciesMet && RunCount == 0;
 
-            // if the filewatchers are not set, then set them.
+            // if the file watchers are not set, then set them.
             if (FileWatchers != null && FileWatchers.Any())
             {
                 foreach (var fileWatcher in FileWatchers)
