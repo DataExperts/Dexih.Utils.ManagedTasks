@@ -551,6 +551,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Full trace of the exception.  This can either be set to a value, or 
         /// will be constructed from the exception.
         /// </summary>
+        [DataMember(Order = 26)]
         public string ExceptionDetails
         {
             get
