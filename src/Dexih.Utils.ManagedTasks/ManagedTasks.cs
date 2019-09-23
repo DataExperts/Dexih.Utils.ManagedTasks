@@ -400,8 +400,8 @@ namespace Dexih.Utils.ManagedTasks
                 
 				if (_runningTasks.Count < _maxConcurrent)
 				{
-					var tryaddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
-					if (!tryaddTask)
+					var tryAddTask = _runningTasks.TryAdd(managedTask.Reference, managedTask);
+					if (!tryAddTask)
 					{
 						throw new ManagedTaskException("Failed to add the managed task to the running tasks queue.");
 					}

@@ -29,6 +29,8 @@ namespace Dexih.Utils.ManagedTasks
         public event EventHandler OnTrigger;
         public event EventHandler OnSchedule;
         public event EventHandler OnFileWatch;
+        
+        private SemaphoreSlim _signal = new SemaphoreSlim(0);
 
         /// <summary>
         /// Used to store changes
@@ -129,6 +131,7 @@ namespace Dexih.Utils.ManagedTasks
         [DataMember(Order = 16)]
         public string StepName { get; set; }
         
+        [IgnoreDataMember]
         public bool IsCompleted => Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed || Status == EManagedTaskStatus.Error;
 
         [DataMember(Order = 17)]
@@ -175,33 +178,15 @@ namespace Dexih.Utils.ManagedTasks
         [IgnoreDataMember]
         public IManagedObject ManagedObject { get; set; }
 
-        // The data object is used to pass data when the managedTask is serialized.
-        private object _data;
-
         [DataMember(Order = 25)]
         public object Data
         {
             get => ManagedObject?.Data ?? _data;
             set => _data = value;
         }
-
-//        /// <summary>
-//        /// Action that will be started and executed when the task starts.
-//        /// </summary>
-//        [JsonIgnore]
-//        public Func<ManagedTask, ManagedTaskProgress, CancellationToken, Task> Action { get; set; }
-//
-//        /// <summary>
-//        /// Action that will be started and executed when the schedule starts.
-//        /// </summary>
-//        [JsonIgnore]
-//        public Action<ManagedTask, DateTime, CancellationToken> ScheduleAction { get; set; }
-//
-//        /// <summary>
-//        /// Action that will be started when a cancel is requested.
-//        /// </summary>
-//        [JsonIgnore]
-//        public Func<ManagedTask, CancellationToken, Task> CancelScheduleAction { get; set; }
+        
+        // The data object is used to pass data when the managedTask is serialized.
+        private object _data;
         
         private readonly CancellationTokenSource _cancellationTokenSource;
 
@@ -506,7 +491,6 @@ namespace Dexih.Utils.ManagedTasks
             }
             
             _cancellationTokenSource.Cancel();
-            
         }
         
         /// <summary>
@@ -520,7 +504,7 @@ namespace Dexih.Utils.ManagedTasks
 
             if (_startTask != null)
             {
-                await Task.Run(() => _startTask, cancellationToken);
+                await _startTask;
             }
 
 //            Success = false;
