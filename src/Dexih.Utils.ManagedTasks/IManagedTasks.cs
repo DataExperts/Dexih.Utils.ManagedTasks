@@ -57,10 +57,10 @@ public interface IManagedTasks
 		IEnumerator<ManagedTask> GetEnumerator();
 		ManagedTask GetTask(string reference);
 		ManagedTask GetTask(string category, long categoryKey);
-		IEnumerable<ManagedTask> GetActiveTasks(string category = null);
-		IEnumerable<ManagedTask> GetRunningTasks(string category = null);
-		IEnumerable<ManagedTask> GetScheduledTasks(string category = null);
-		IEnumerable<ManagedTask> GetCompletedTasks(string category = null);
+		IEnumerable<ManagedTask> GetActiveTasks(string category = "");
+		IEnumerable<ManagedTask> GetRunningTasks(string category = "");
+		IEnumerable<ManagedTask> GetScheduledTasks(string category = "");
+		IEnumerable<ManagedTask> GetCompletedTasks(string category = "");
 		void Cancel(IEnumerable<string> references);
 		IEnumerable<ManagedTask> GetTaskChanges(bool resetTaskChanges = false);
 		int TaskChangesCount();

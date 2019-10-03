@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -24,11 +24,11 @@ namespace Dexih.Utils.ManagedTasks
     [DataContract]
     public sealed class ManagedTask: IDisposable
     {
-        public event EventHandler<EManagedTaskStatus> OnStatus;
-        public event EventHandler<ManagedTaskProgressItem> OnProgress;
-        public event EventHandler OnTrigger;
-        public event EventHandler OnSchedule;
-        public event EventHandler OnFileWatch;
+        public event EventHandler<EManagedTaskStatus>? OnStatus;
+        public event EventHandler<ManagedTaskProgressItem>? OnProgress;
+        public event EventHandler? OnTrigger;
+        public event EventHandler? OnSchedule;
+        public event EventHandler? OnFileWatch;
         
         private SemaphoreSlim _signal = new SemaphoreSlim(0);
 
@@ -47,7 +47,7 @@ namespace Dexih.Utils.ManagedTasks
         
         [JsonIgnore]
         [IgnoreDataMember]
-        public Exception Exception { get; set; }
+        public Exception? Exception { get; set; }
 
         /// <summary>
         /// Unique key used to reference the task
@@ -186,7 +186,7 @@ namespace Dexih.Utils.ManagedTasks
         }
         
         // The data object is used to pass data when the managedTask is serialized.
-        private object _data;
+        private object? _data;
         
         private readonly CancellationTokenSource _cancellationTokenSource;
 

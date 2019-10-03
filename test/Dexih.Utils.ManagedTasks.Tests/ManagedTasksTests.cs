@@ -33,29 +33,6 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             _output.WriteLine($"Error tasks count: {managedTasks.ErrorCount }");
         }
 
-        private class ProgressTask : ManagedObject
-        {
-            public ProgressTask(int delay, int loops)
-            {
-                _delay = delay;
-                _loops = loops;
-            }
-
-            private readonly int _delay;
-            private readonly int _loops;
-            
-            public override async Task StartAsync(ManagedTaskProgress progress, CancellationToken cancellationToken = default)
-            {
-                for (var i = 0; i < _loops; i++)
-                {
-                    await Task.Delay(_delay, cancellationToken);
-                    var percent = (i+1) *(100 / _loops);
-                    progress.Report(percent, "step: " + percent);
-                }
-            }
-
-            public override object Data { get; set; }
-        }
 
         [Theory]
         [InlineData(2000)]
@@ -112,7 +89,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             cts.CancelAfter(30000);
             await managedTasks.WhenAll(cts.Token);
 
-            Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
+            Assert.Single(managedTasks.GetCompletedTasks());
 
             // ensure the progress was called at least once. 
             // This doesn't get called for every progress event as when they stack up they get dropped
@@ -137,7 +114,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             managedTasks.Add("123", "task", "test","category", 1, "id", 1, progressTask, null, null, null);
 
             //adding the same task when running should result in error.
-            Assert.Throws(typeof(ManagedTaskException),   () =>
+            Assert.Throws<ManagedTaskException>(() =>
             {
                 managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask, null, null, null);
             });
@@ -149,7 +126,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             // add the same task again now the previous one has finished.
             managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask, null, null, null);
 
-            Assert.Equal(1, managedTasks.GetCompletedTasks().Count());
+            Assert.Single(managedTasks.GetCompletedTasks());
         }
         
 
@@ -158,9 +135,9 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         /// </summary>
         /// <returns></returns>
         [Theory]
-        [InlineData(EConcurrentTaskAction.Sequence, EManagedTaskStatus.Completed)]
-        [InlineData(EConcurrentTaskAction.Parallel, EManagedTaskStatus.Error)]
-        public async Task Test_Add_SameTask_ActionsAsync(EConcurrentTaskAction concurrentTaskAction, EManagedTaskStatus status)
+        [InlineData(EConcurrentTaskAction.Sequence)]
+        [InlineData(EConcurrentTaskAction.Parallel)]
+        public async Task Test_Add_SameTask_ActionsAsync(EConcurrentTaskAction concurrentTaskAction)
         {
             var managedTasks = new ManagedTasks.ManagedTasks();
             
@@ -273,9 +250,9 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             
             Assert.Equal(taskCount, runningCounter);
             Assert.Equal(taskCount, completedCounter);
-            Assert.Equal(0, managedTasks.Count());
-            Assert.Equal(0, managedTasks.GetActiveTasks().Count());
-            Assert.Equal(0, managedTasks.GetRunningTasks().Count());
+            Assert.Empty(managedTasks);
+            Assert.Empty(managedTasks.GetActiveTasks());
+            Assert.Empty(managedTasks.GetRunningTasks());
 
             // check the changes history
             var changes = managedTasks.GetTaskChanges().ToArray();
@@ -335,7 +312,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 // all error counters should equal the number of tasks
                 Assert.Equal(taskCount, managedTasks.ErrorCount);
                 Assert.Equal(taskCount, errorCount);
-                Assert.Equal(0, managedTasks.Count());
+                Assert.Empty(managedTasks);
             }
         }
 
@@ -371,7 +348,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             // counter should equal the number of tasks
             Assert.Equal(100, _cancelCounter);
-            Assert.Equal(0, managedTasks.Count());
+            Assert.Empty(managedTasks);
         }
 
        void CancelResult(object sender, EManagedTaskStatus status)
@@ -545,12 +522,12 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             var task = managedTasks.Add("123", "task3", "test", managedObject, new[] { trigger });
 
-            Assert.Equal(1, managedTasks.GetScheduledTasks().Count());
+            Assert.Single(managedTasks.GetScheduledTasks());
 
             await Task.Delay(2000, CancellationToken.None);
             task.Cancel();
             await Task.Delay(100, CancellationToken.None); //small delay to give spooler a chance to remove task from schedule.
-            Assert.Equal(0,  managedTasks.GetScheduledTasks().Count());
+            Assert.Empty(managedTasks.GetScheduledTasks());
             
         }
 
