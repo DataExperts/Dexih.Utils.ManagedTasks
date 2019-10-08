@@ -13,39 +13,7 @@ namespace Dexih.Utils.ManagedTasks
     [DataContract]
     public class ManagedTaskSchedule
     {
-        /// <summary>
-        /// Day of the week
-        /// </summary>
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EDayOfWeek
-        {
-            Sunday = 1,
-            Monday = 2,
-            Tuesday = 3,
-            Wednesday = 4,
-            Thursday = 5,
-            Friday = 6,
-            Saturday = 7
-        }
-
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EIntervalType
-        {
-            Once = 1,
-            Interval,
-            Daily,
-            Monthly
-        }
-
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EWeekOfMonth
-        {
-            First = 1,
-            Second,
-            Third,
-            Fourth,
-            Last
-        }
+       
 
         public ManagedTaskSchedule() { }
 
@@ -162,6 +130,8 @@ namespace Dexih.Utils.ManagedTasks
 
                 switch (IntervalType)
                 {
+                    case EIntervalType.None:
+                        return "";
                     case EIntervalType.Once:
                         desc.AppendLine($"Once " + StartDateTimeDesc());
                         break;
@@ -240,6 +210,9 @@ namespace Dexih.Utils.ManagedTasks
             DateTime? nextDate = null;
             switch(IntervalType)
             {
+                case EIntervalType.None:
+                    nextDate = null;
+                    break;
                 case EIntervalType.Daily:
                     nextDate = NextOccurrenceDaily(fromDate);
                     break;
@@ -487,6 +460,11 @@ namespace Dexih.Utils.ManagedTasks
         /// <param name="checkDate"></param>
         public bool IsValidDate(DateTime checkDate)
         {
+            if (IntervalType == EIntervalType.None)
+            {
+                return false;
+            }
+            
             if(IntervalType == EIntervalType.Once)
             {
                 return true;

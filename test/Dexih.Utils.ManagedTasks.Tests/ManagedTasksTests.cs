@@ -426,7 +426,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             {
                 StartDate = currentDate,
                 StartTime = currentDate.AddSeconds(5).TimeOfDay,
-                IntervalType = ManagedTaskSchedule.EIntervalType.Once
+                IntervalType = EIntervalType.Once
             };
             
             _output.WriteLine($"Time to Start: {trigger.NextOccurrence(DateTime.Now)-DateTime.Now}");

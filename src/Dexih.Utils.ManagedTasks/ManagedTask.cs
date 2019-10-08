@@ -8,18 +8,7 @@ using System.Threading.Tasks;
 
 namespace Dexih.Utils.ManagedTasks
 {
-    // [JsonConverter(typeof(StringEnumConverter))]
-    public enum EManagedTaskStatus
-    {
-        Created = 1, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
-    }
 
-    public enum EConcurrentTaskAction
-    {
-        Parallel = 1,
-        Abend,
-        Sequence
-    }
     
     [DataContract]
     public sealed class ManagedTask: IDisposable
