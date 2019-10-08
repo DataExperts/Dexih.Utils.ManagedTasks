@@ -27,7 +27,11 @@ namespace Dexih.Utils.ManagedTasks
 
         private FileSystemWatcher _fileSystemWatcher;
         private readonly HashSet<string> _filesProcessed;
-        
+
+        public ManagedTaskFileWatcher()
+        {
+            _filesProcessed = new HashSet<string>();
+        }
         public ManagedTaskFileWatcher(string path, string filter)
         {
             Path = path;

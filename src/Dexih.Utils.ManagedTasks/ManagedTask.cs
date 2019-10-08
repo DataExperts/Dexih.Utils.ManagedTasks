@@ -540,8 +540,11 @@ namespace Dexih.Utils.ManagedTasks
 
             if (_startTask != null)
             {
-                _startTask.Wait();
-                _startTask.Dispose();
+                lock (_startTask)
+                {
+                    _startTask.Wait();
+                    _startTask.Dispose();
+                }
             }
         }
 
