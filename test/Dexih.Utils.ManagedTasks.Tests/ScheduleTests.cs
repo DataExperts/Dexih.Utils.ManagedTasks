@@ -58,7 +58,8 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var schedule = new ManagedTaskSchedule()
             {
                 StartTime = currentDate.AddMinutes(-2).TimeOfDay,
-                EndTime = currentDate.AddMinutes(-1).TimeOfDay
+                EndTime = currentDate.AddMinutes(-1).TimeOfDay,
+                IntervalType = EIntervalType.Daily
             };
 
             var nextSchedule = (DateTime)schedule.NextOccurrence(currentDate);
@@ -67,8 +68,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             TimeTest(DateTime.Now.AddDays(1).AddMinutes(-2), nextSchedule);
         }
-
-
+        
         [Fact]
         public void ScheduleTestOnce()
         {

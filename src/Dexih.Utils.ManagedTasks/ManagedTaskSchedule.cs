@@ -13,39 +13,7 @@ namespace Dexih.Utils.ManagedTasks
     [DataContract]
     public class ManagedTaskSchedule
     {
-        /// <summary>
-        /// Day of the week
-        /// </summary>
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EDayOfWeek
-        {
-            Sunday = 1,
-            Monday = 2,
-            Tuesday = 3,
-            Wednesday = 4,
-            Thursday = 5,
-            Friday = 6,
-            Saturday = 7
-        }
-
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EIntervalType
-        {
-            Once = 1,
-            Interval,
-            Daily,
-            Monthly
-        }
-
-        // [JsonConverter(typeof(StringEnumConverter))]
-        public enum EWeekOfMonth
-        {
-            First = 1,
-            Second,
-            Third,
-            Fourth,
-            Last
-        }
+       
 
         public ManagedTaskSchedule() { }
 
@@ -162,18 +130,20 @@ namespace Dexih.Utils.ManagedTasks
 
                 switch (IntervalType)
                 {
+                    case EIntervalType.None:
+                        return "";
                     case EIntervalType.Once:
                         desc.AppendLine($"Once " + StartDateTimeDesc());
                         break;
                     case EIntervalType.Interval:
-                        if (IntervalTime == null)
+                        if (IntervalTime == null || IntervalTime == TimeSpan.Zero)
                         {
                             desc.AppendLine("Error: Interval specified, however no interval time set.");
                         }
                         else
                         {
                             desc.AppendLine($"Starts at {StartDateTimeDesc()}");
-                            if (IntervalTime != null) desc.AppendLine($"Every {IntervalTime.Value.ToString()}");
+                            desc.AppendLine($"Every {IntervalTime.Value.ToString()}");
                             desc.AppendLine("Between " + (StartTime == null ? "00:00:00" : StartTime.Value.ToString()) + " and " + (EndTime == null ? "23:59:59" : EndTime.Value.ToString()));
                             if (MaxRecurs != null || MaxRecurs < 0) desc.AppendLine("Maximum recurrences of " + MaxRecurs.Value);
                         }
@@ -240,6 +210,9 @@ namespace Dexih.Utils.ManagedTasks
             DateTime? nextDate = null;
             switch(IntervalType)
             {
+                case EIntervalType.None:
+                    nextDate = null;
+                    break;
                 case EIntervalType.Daily:
                     nextDate = NextOccurrenceDaily(fromDate);
                     break;
@@ -331,7 +304,7 @@ namespace Dexih.Utils.ManagedTasks
                 var startDateTime = new DateTime(nextDate.Year, nextDate.Month, nextDate.Day);
                 if (StartTime != null)
                 {
-                    startDateTime.Add(StartTime.Value);
+                    startDateTime = startDateTime.Add(StartTime.Value);
                 }
                 return startDateTime;
             }
@@ -367,7 +340,7 @@ namespace Dexih.Utils.ManagedTasks
                 var startDateTime = new DateTime(nextDate.Year, nextDate.Month, nextDate.Day);
                 if (StartTime != null)
                 {
-                    startDateTime.Add(StartTime.Value);
+                    startDateTime = startDateTime.Add(StartTime.Value);
                 }
                 return startDateTime;
             }
@@ -414,12 +387,13 @@ namespace Dexih.Utils.ManagedTasks
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
             {
-                if (IntervalTime == null)
+                if (IntervalTime == null || IntervalTime == TimeSpan.Zero)
                 {
-                    if (startAt.TimeOfDay < fromDate.TimeOfDay)
-                    {
-                        startAt = startAt.Date.Add(fromDate.TimeOfDay);
-                    }
+                    throw new ManagedTaskTriggerException(this, "The interval time must be set to a non-null/non-zero value.");
+//                    if (startAt.TimeOfDay < fromDate.TimeOfDay)
+//                    {
+//                        startAt = startAt.Date.Add(fromDate.TimeOfDay);
+//                    }
                 }
                 else
                 {
@@ -472,7 +446,7 @@ namespace Dexih.Utils.ManagedTasks
                     startAt = startAt.Date.Add(dailyStart);
                 }
 
-                if (IntervalTime == null && startAt < fromDate)
+                if ((IntervalTime == null || IntervalTime == TimeSpan.Zero) && startAt < fromDate)
                 {
                     return null;
                 }
@@ -487,6 +461,11 @@ namespace Dexih.Utils.ManagedTasks
         /// <param name="checkDate"></param>
         public bool IsValidDate(DateTime checkDate)
         {
+            if (IntervalType == EIntervalType.None)
+            {
+                return false;
+            }
+            
             if(IntervalType == EIntervalType.Once)
             {
                 return true;

@@ -645,15 +645,23 @@ namespace Dexih.Utils.ManagedTasks
 			return _completedTasks.Values.Where(c => c.Category == category);
 		}
 
-		public void Cancel(IEnumerable<string> references)
+		public Task CancelAsync(IEnumerable<string> references)
 		{
+			var tasks = new List<Task>();
 			foreach (var reference in references)
 			{
 				if(_activeTasks.TryGetValue(reference, out var task))
 				{
-					task.CancelAsync();
+					tasks.Add(task.CancelAsync());
 				}
 			}
+
+			if (tasks.Count == 0)
+			{
+				return Task.CompletedTask;
+			}
+			
+			return Task.WhenAll(tasks);
 		}
 		
         public IEnumerable<ManagedTask> GetTaskChanges(bool resetTaskChanges = false)

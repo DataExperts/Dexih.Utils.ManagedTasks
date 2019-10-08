@@ -426,7 +426,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             {
                 StartDate = currentDate,
                 StartTime = currentDate.AddSeconds(5).TimeOfDay,
-                IntervalType = ManagedTaskSchedule.EIntervalType.Once
+                IntervalType = EIntervalType.Once
             };
             
             _output.WriteLine($"Time to Start: {trigger.NextOccurrence(DateTime.Now)-DateTime.Now}");
@@ -441,6 +441,46 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             Assert.True(trigger.StartDate.Value.AddSeconds(5) < DateTime.Now);
         }
 
+        [Fact]
+        public async Task Test_ManagedTask_Schedule_Error_No_IntervalTime()
+        {
+            var managedTasks = new ManagedTasks.ManagedTasks();
+            
+            var startTime = DateTime.Now.TimeOfDay;
+
+            // simple task that takes 1 second to run
+            var managedObject = new ProgressTask(1000, 1);
+            
+            var scheduleCount = 0;
+            
+            void OnSchedule(object sender, EManagedTaskStatus status)
+            {
+                if (status == EManagedTaskStatus.Scheduled)
+                {
+                    Interlocked.Increment(ref scheduleCount);
+                }
+            }
+
+            managedTasks.OnStatus += OnSchedule;
+
+            // starts in 1 second, then runs 1 second job
+            var trigger = new ManagedTaskSchedule()
+            {
+                StartDate = DateTime.Now,
+                StartTime = DateTime.Now.AddSeconds(1).TimeOfDay,
+                IntervalTime = TimeSpan.FromSeconds(0),
+                MaxRecurs = null,
+                IntervalType = EIntervalType.Interval
+            };
+
+            managedTasks.Add("123", "task3", "test", managedObject, new[] { trigger });
+
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(30000);
+
+            Assert.ThrowsAsync<ManagedTaskTriggerException>(async () => await managedTasks.WhenAll(cts.Token));
+        }
+        
         [Fact]
         public async Task Test_ManagedTask_Schedule_RecurringAsync()
         {

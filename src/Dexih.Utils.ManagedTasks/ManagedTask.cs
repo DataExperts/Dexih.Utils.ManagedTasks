@@ -8,18 +8,7 @@ using System.Threading.Tasks;
 
 namespace Dexih.Utils.ManagedTasks
 {
-    // [JsonConverter(typeof(StringEnumConverter))]
-    public enum EManagedTaskStatus
-    {
-        Created = 1, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed
-    }
 
-    public enum EConcurrentTaskAction
-    {
-        Parallel = 1,
-        Abend,
-        Sequence
-    }
     
     [DataContract]
     public sealed class ManagedTask: IDisposable
@@ -29,8 +18,6 @@ namespace Dexih.Utils.ManagedTasks
         public event EventHandler? OnTrigger;
         public event EventHandler? OnSchedule;
         public event EventHandler? OnFileWatch;
-        
-        private SemaphoreSlim _signal = new SemaphoreSlim(0);
 
         /// <summary>
         /// Used to store changes
@@ -498,7 +485,7 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         /// 
         /// <returns></returns>
-        public async Task CancelAsync(CancellationToken cancellationToken = default)
+        public async Task CancelAsync()
         {
             Cancel();
 

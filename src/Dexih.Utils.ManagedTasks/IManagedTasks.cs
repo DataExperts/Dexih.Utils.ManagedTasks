@@ -61,7 +61,7 @@ public interface IManagedTasks
 		IEnumerable<ManagedTask> GetRunningTasks(string category = "");
 		IEnumerable<ManagedTask> GetScheduledTasks(string category = "");
 		IEnumerable<ManagedTask> GetCompletedTasks(string category = "");
-		void Cancel(IEnumerable<string> references);
+		Task CancelAsync(IEnumerable<string> references);
 		IEnumerable<ManagedTask> GetTaskChanges(bool resetTaskChanges = false);
 		int TaskChangesCount();
 		void Dispose();
