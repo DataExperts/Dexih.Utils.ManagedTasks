@@ -105,6 +105,23 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         }
 
         [Fact]
+        public async Task Test_ManagedTask_BadTrigger()
+        {
+            var managedTasks = new ManagedTasks.ManagedTasks();
+            
+            var trigger = new ManagedTaskSchedule(TimeSpan.Zero, 5);
+            var triggers = new[] {trigger};
+            var progressTask = new ProgressTask(200 ,5);
+            Assert.Throws<ManagedTaskTriggerException>(() =>
+            {
+                var managedTask = managedTasks.Add("123", "task", "test", "category", 1, "id", 1, progressTask,
+                    triggers, null, null);
+            });
+
+            Assert.Equal(0, managedTasks.GetActiveTasks().Count());
+        }
+
+        [Fact]
         public async Task Test_ManagedTasks_WithKeysAsync()
         {
             var managedTasks = new ManagedTasks.ManagedTasks();
@@ -618,7 +635,6 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                     Interlocked.Increment(ref fileWatchCount);
                 }
             }
-            
             
             managedTasks.OnStatus += OnFileWatch;
             

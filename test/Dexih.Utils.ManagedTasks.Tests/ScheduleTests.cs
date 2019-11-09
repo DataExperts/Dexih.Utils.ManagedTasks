@@ -84,7 +84,8 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             Assert.Null(schedule2.NextOccurrence(DateTime.Now));
 
         }
-
+        
+        
 //TODO more schedule tests
 
     }

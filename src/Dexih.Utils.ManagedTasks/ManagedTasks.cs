@@ -92,14 +92,17 @@ namespace Dexih.Utils.ManagedTasks
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
-			if(!string.IsNullOrEmpty(managedTask.Category) && managedTask.CategoryKey > 0 && ContainsKey(managedTask.Category, managedTask.CategoryKey))
+
+			if (!string.IsNullOrEmpty(managedTask.Category) && managedTask.CategoryKey > 0 &&
+			    ContainsKey(managedTask.Category, managedTask.CategoryKey))
 			{
 				switch (managedTask.ConcurrentTaskAction)
 				{
 					case EConcurrentTaskAction.Parallel:
 						break;
 					case EConcurrentTaskAction.Abend:
-						throw new ManagedTaskException($"The {managedTask.Category} - {managedTask.Name} (key {managedTask.CategoryKey}) is already active and cannot be run at the same time.");
+						throw new ManagedTaskException(
+							$"The {managedTask.Category} - {managedTask.Name} (key {managedTask.CategoryKey}) is already active and cannot be run at the same time.");
 					case EConcurrentTaskAction.Sequence:
 						var depTasks = GetTasks(managedTask.Category, managedTask.CategoryKey);
 						var depReferences = depTasks.Select(c => c.Reference);
@@ -112,6 +115,7 @@ namespace Dexih.Utils.ManagedTasks
 							managedTask.DependentReferences =
 								managedTask.DependentReferences.Concat(depReferences).ToArray();
 						}
+
 						break;
 					default:
 						throw new ArgumentOutOfRangeException();
@@ -126,30 +130,40 @@ namespace Dexih.Utils.ManagedTasks
 				throw new ManagedTaskException("Failed to add the task to the active tasks list.");
 			}
 
-			// if there are no dependencies, put the task immediately on the queue.
-			if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
-			    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
-			    (managedTask.DependentReferences ==null || !managedTask.DependentReferences.Any()))
+			try
 			{
-				Start(managedTask.Reference);
-			}
-			else
-			{
-				if (!(managedTask.Schedule()))
+				// if there are no dependencies, put the task immediately on the queue.
+				if ((managedTask.Triggers == null || !managedTask.Triggers.Any()) &&
+				    (managedTask.FileWatchers == null || !managedTask.FileWatchers.Any()) &&
+				    (managedTask.DependentReferences == null || !managedTask.DependentReferences.Any()))
 				{
-					if (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0)
-					{
-						throw new ManagedTaskException("The task could not be started as none of the triggers returned a future schedule time.");
-					}
+					Start(managedTask.Reference);
 				}
-				
-				Schedule(managedTask.Reference);
-			}
+				else
+				{
+					if (!(managedTask.Schedule()))
+					{
+						if (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0)
+						{
+							throw new ManagedTaskException(
+								"The task could not be started as none of the triggers returned a future schedule time.");
+						}
+					}
 
-			return managedTask;
+					Schedule(managedTask.Reference);
+				}
+
+				return managedTask;
+			}
+			catch (Exception ex)
+			{
+				_activeTasks.TryRemove(managedTask.Reference, out var _);
+				managedTask.Dispose();
+				throw;
+			}
 		}
 
-        public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
         {
             return Add(originatorId, name, category, 0, "", 0, managedObject, triggers, dependentReferences);
         }
@@ -465,76 +479,86 @@ namespace Dexih.Utils.ManagedTasks
 
         private void ReStartTask(ManagedTask managedTask)
         {
-          	Interlocked.Increment(ref _resetRunningCount);
+	        try
+	        {
+		        Interlocked.Increment(ref _resetRunningCount);
 
-            // copy the activeTask so it is preserved when job is rerun to to schedule.
-            var completedTask = managedTask.Copy();
+		        // copy the activeTask so it is preserved when job is rerun to to schedule.
+		        var completedTask = managedTask.Copy();
 
-			if (managedTask.Schedule())
-			{
-				_taskChangeHistory.AddOrUpdate(completedTask.ChangeId, completedTask, (oldKey, oldValue) => completedTask);
-				managedTask.ResetChangeId();
+		        if (managedTask.Schedule())
+		        {
+			        _taskChangeHistory.AddOrUpdate(completedTask.ChangeId, completedTask,
+				        (oldKey, oldValue) => completedTask);
+			        managedTask.ResetChangeId();
 
-				Schedule(managedTask.Reference);
-			}
-			else
-			{
-				if (!_activeTasks.ContainsKey(managedTask.Reference))
-				{
-					return;
-				}
+			        Schedule(managedTask.Reference);
+		        }
+		        else
+		        {
+			        if (!_activeTasks.ContainsKey(managedTask.Reference))
+			        {
+				        return;
+			        }
 
-				managedTask.Dispose();
+			        managedTask.Dispose();
 
-				if (!_activeTasks.TryRemove(managedTask.Reference, out var activeTask))
-				{
-					_exitException =
-						new ManagedTaskException("Failed to remove the task to the active tasks list.");
-					SetException(_exitException);
-				}
-				
-				_completedTasks.AddOrUpdate((activeTask.Category, activeTask.CategoryKey), activeTask,
-					(oldKey, oldValue) => activeTask);
-			}
+			        if (!_activeTasks.TryRemove(managedTask.Reference, out var activeTask))
+			        {
+				        _exitException =
+					        new ManagedTaskException("Failed to remove the task to the active tasks list.");
+				        SetException(_exitException);
+			        }
 
-			// check all active tasks, to see if the dependency conditions have been met.
-			foreach (var activeTask in _activeTasks.Values)
-			{
-				if (activeTask.DependentReferences != null && activeTask.DependentReferences.Length > 0)
-				{
-					var depFound = false;
-					foreach (var dep in activeTask.DependentReferences)
-					{
-						if (_activeTasks.ContainsKey(dep))
-						{
-							depFound = true;
-							break;
-						}
-					}
+			        _completedTasks.AddOrUpdate((activeTask.Category, activeTask.CategoryKey), activeTask,
+				        (oldKey, oldValue) => activeTask);
+		        }
 
-					// if no dependent tasks are found, then the current task is ready to go.
-					if (!depFound)
-					{
-						// check dependencies are not already met is not already set, which can happen when two dependent tasks finish at the same time.
-						if (!activeTask.DependenciesMet)
-						{
-							activeTask.DependenciesMet = true;
-							if (activeTask.Schedule())
-							{
-								Start(activeTask.Reference);
-							}
-						}
-					}
-				}
-			}
+		        // check all active tasks, to see if the dependency conditions have been met.
+		        foreach (var activeTask in _activeTasks.Values)
+		        {
+			        if (activeTask.DependentReferences != null && activeTask.DependentReferences.Length > 0)
+			        {
+				        var depFound = false;
+				        foreach (var dep in activeTask.DependentReferences)
+				        {
+					        if (_activeTasks.ContainsKey(dep))
+					        {
+						        depFound = true;
+						        break;
+					        }
+				        }
 
-	        Interlocked.Decrement(ref _resetRunningCount);
+				        // if no dependent tasks are found, then the current task is ready to go.
+				        if (!depFound)
+				        {
+					        // check dependencies are not already met is not already set, which can happen when two dependent tasks finish at the same time.
+					        if (!activeTask.DependenciesMet)
+					        {
+						        activeTask.DependenciesMet = true;
+						        if (activeTask.Schedule())
+						        {
+							        Start(activeTask.Reference);
+						        }
+					        }
+				        }
+			        }
+		        }
 
-			if (_activeTasks.Count == 0 && _resetRunningCount == 0)
-			{
-				SetResult(true);
-			}
-		}
+		        Interlocked.Decrement(ref _resetRunningCount);
+
+		        if (_activeTasks.Count == 0 && _resetRunningCount == 0)
+		        {
+			        SetResult(true);
+		        }
+	        }
+	        catch (Exception ex)
+	        {
+		        _activeTasks.TryRemove(managedTask.Reference, out var _);
+		        managedTask.Dispose();
+		        throw;
+	        }
+        }
 
 		private void ProgressChanged(object sender, ManagedTaskProgressItem progress)
 		{
