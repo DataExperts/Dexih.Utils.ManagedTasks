@@ -16,14 +16,14 @@ namespace Dexih.Utils.ManagedTasks
 
         public abstract Task StartAsync(ManagedTaskProgress progress, CancellationToken cancellationToken = default);
 
-        public void Cancel()
+        public virtual void Cancel()
         {
         }
 
-        public void Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
+        public virtual void Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
         {
         }
 
-        public abstract object Data { get; set; }
+        public virtual object Data { get; set; } = null;
     }
 }

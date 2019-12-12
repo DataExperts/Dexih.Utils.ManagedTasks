@@ -35,7 +35,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             //Set a starttime 1 minute from now
             DateTime currentDate = DateTime.Now;
 
-            var schedule = new ManagedTaskSchedule()
+            var schedule = new ManagedTaskTrigger()
             {
                 StartDate = currentDate,
                 StartTime = currentDate.AddMinutes(1).TimeOfDay
@@ -55,7 +55,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             // set a start time 2 minutes ago, with end time 1 minute ago
             // which should schedule the next run time tomorrow
-            var schedule = new ManagedTaskSchedule()
+            var schedule = new ManagedTaskTrigger()
             {
                 StartTime = currentDate.AddMinutes(-2).TimeOfDay,
                 EndTime = currentDate.AddMinutes(-1).TimeOfDay,
@@ -74,12 +74,12 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         {
             //the schedule once, should be return the same date if in the future.
             var startDate = DateTime.Now.AddHours(1);
-            var schedule = new ManagedTaskSchedule(startDate);
+            var schedule = new ManagedTaskTrigger(startDate);
             Assert.Equal(startDate, schedule.NextOccurrence(DateTime.Now));
 
             //the schedule once should return null if the startdate is in the past.
             var startDate2 = DateTime.Now.AddHours(-1);
-            var schedule2 = new ManagedTaskSchedule(startDate2);
+            var schedule2 = new ManagedTaskTrigger(startDate2);
             _output.WriteLine($"Schedule details {schedule.Details}.");
             Assert.Null(schedule2.NextOccurrence(DateTime.Now));
 

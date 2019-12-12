@@ -13,8 +13,11 @@ namespace Dexih.Utils.ManagedTasks
     [DataContract]
     public sealed class ManagedTask: IDisposable
     {
-        public event EventHandler<EManagedTaskStatus>? OnStatus;
-        public event EventHandler<ManagedTaskProgressItem>? OnProgress;
+        public event StatusDelegate OnStatus;
+        public delegate void StatusDelegate(ManagedTask managedTask, EManagedTaskStatus status);
+        public event Progress OnProgress;
+        public delegate void Progress(ManagedTask managedTask, ManagedTaskProgressItem managedTaskProgressItem);
+
         public event EventHandler? OnTrigger;
         public event EventHandler? OnSchedule;
         public event EventHandler? OnFileWatch;
@@ -107,7 +110,7 @@ namespace Dexih.Utils.ManagedTasks
         public long Counter { get; set; }
 
         /// <summary>
-        /// Action to take when a task with the same referenceKey is added.
+        /// Action to take when a task with the same category or/and categoryKey is added.
         /// </summary>
         [DataMember(Order = 15)]
         public EConcurrentTaskAction ConcurrentTaskAction { get; set; } = EConcurrentTaskAction.Abend;
@@ -128,7 +131,7 @@ namespace Dexih.Utils.ManagedTasks
         public DateTime EndTime { get; private set; }
 
         [DataMember(Order = 19)]
-        public IEnumerable<ManagedTaskSchedule> Triggers { get; set; }
+        public IEnumerable<ManagedTaskTrigger> Triggers { get; set; }
         
         [DataMember(Order = 20)]
         public IEnumerable<ManagedTaskFileWatcher> FileWatchers { get; set; }

@@ -16,9 +16,11 @@ namespace Dexih.Utils.ManagedTasks
 	[DataContract]
 	public class ManagedTasks : IEnumerable<ManagedTask>, IDisposable, IManagedTasks
 	{
-		public event EventHandler<EManagedTaskStatus> OnStatus;
-		public event EventHandler<ManagedTaskProgressItem> OnProgress;
-
+		public event Status OnStatus;
+		public delegate void Status(ManagedTask managedTask, EManagedTaskStatus status);
+		public event Progress OnProgress;
+		public delegate void Progress(ManagedTask managedTask, ManagedTaskProgressItem managedTaskProgressItem);
+		
 		private readonly int _maxConcurrent;
 		
 		private long _createdCount;
@@ -112,8 +114,7 @@ namespace Dexih.Utils.ManagedTasks
 						}
 						else
 						{
-							managedTask.DependentReferences =
-								managedTask.DependentReferences.Concat(depReferences).ToArray();
+							managedTask.DependentReferences = managedTask.DependentReferences.Concat(depReferences).ToArray();
 						}
 
 						break;
@@ -141,6 +142,17 @@ namespace Dexih.Utils.ManagedTasks
 				}
 				else
 				{
+					if (managedTask.Triggers != null)
+					{
+						foreach (var trigger in managedTask.Triggers)
+						{
+							if (trigger.StartTime == null)
+							{
+								trigger.StartTime = DateTime.Now.TimeOfDay.Add(TimeSpan.FromSeconds(1));
+							}
+						}
+					}
+
 					if (!(managedTask.Schedule()))
 					{
 						if (managedTask.DependentReferences == null || managedTask.DependentReferences.Length == 0)
@@ -163,22 +175,22 @@ namespace Dexih.Utils.ManagedTasks
 			}
 		}
 
-		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
         {
             return Add(originatorId, name, category, 0, "", 0, managedObject, triggers, dependentReferences);
         }
 
-		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			return Add(originatorId, name, category, 0, 0, managedObject, triggers, fileWatchers, dependentReferences);
 		}
 
-        public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers)
+        public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers)
         {
             return Add(originatorId, name, category, 0, "", 0, managedObject, triggers, null);
         }
 
-		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers)
+		public ManagedTask Add(string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers)
 		{
 			return Add(originatorId, name, category, 0, 0, managedObject, triggers, fileWatchers, null);
 		}
@@ -188,34 +200,34 @@ namespace Dexih.Utils.ManagedTasks
             return Add(originatorId, name, category, 0, "", 0, managedObject, null, null);
         }
 
-        public ManagedTask Add(string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string originatorId, string name, string category, long hubKey, string remoteAgentId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
 			return Add(reference, originatorId, name, category, hubKey, remoteAgentId, categoryKey, managedObject, triggers, null, dependentReferences);
 		}
 		
-		public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+		public ManagedTask Add(string originatorId, string name, string category, long hubKey, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var reference = Guid.NewGuid().ToString();
 			return Add(reference, originatorId, name, category, hubKey, "", categoryKey, managedObject, triggers, fileWatchers, dependentReferences);
 		}
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, string[] dependentReferences)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, string[] dependentReferences)
         {
             return Add(reference, originatorId, name, category, 0, "", 0, managedObject, triggers, null, dependentReferences);
         }
 
-        public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers)
         {
             return Add(reference, originatorId, name, category, 0, "", 0, managedObject, triggers, null, null);
         }
 		
-		public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences)
+		public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher, string[] dependentReferences)
 		{
 			return Add(reference, originatorId, name, category, 0, "", 0, managedObject, triggers, fileWatcher, dependentReferences);
 		}
 
-		public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher)
+		public ManagedTask Add(string reference, string originatorId, string name, string category, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatcher)
 		{
 			return Add(reference, originatorId, name, category, 0, "", 0, managedObject, triggers, fileWatcher, null);
 		}
@@ -240,7 +252,7 @@ namespace Dexih.Utils.ManagedTasks
         /// <param name="dependentReferences"></param>
         /// <param name="referenceKey"></param>
         /// <returns></returns>
-        public ManagedTask Add(string reference, string originatorId, string name, string category, long referenceKey, string referenceId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskSchedule> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
+        public ManagedTask Add(string reference, string originatorId, string name, string category, long referenceKey, string referenceId, long categoryKey, IManagedObject managedObject, IEnumerable<ManagedTaskTrigger> triggers, IEnumerable<ManagedTaskFileWatcher> fileWatchers, string[] dependentReferences)
 		{
 			var managedTask = new ManagedTask
 			{
@@ -260,9 +272,9 @@ namespace Dexih.Utils.ManagedTasks
 			return Add(managedTask);
 		}
 
-        private void StatusChange(object sender, EManagedTaskStatus newStatus)
+        private void StatusChange(ManagedTask managedTask, EManagedTaskStatus newStatus)
         {
-	        _statusChangeQueue.Add((newStatus, (ManagedTask) sender));
+	        _statusChangeQueue.Add((newStatus, managedTask));
         }
 
         private void ProcessStatusChanges()
@@ -434,7 +446,6 @@ namespace Dexih.Utils.ManagedTasks
 			}
 		}
 
-		
 		private void UpdateRunningQueue()
 		{
 			var startTasks = new List<ManagedTask>();
@@ -560,11 +571,10 @@ namespace Dexih.Utils.ManagedTasks
 	        }
         }
 
-		private void ProgressChanged(object sender, ManagedTaskProgressItem progress)
+		private void ProgressChanged(ManagedTask managedTask, ManagedTaskProgressItem progress)
 		{
-			var managedTask = (ManagedTask)sender;
 			_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask, (oldKey, oldValue) => managedTask);
-			OnProgress?.Invoke(sender, progress);
+			OnProgress?.Invoke(managedTask, progress);
 		}
 		
 		

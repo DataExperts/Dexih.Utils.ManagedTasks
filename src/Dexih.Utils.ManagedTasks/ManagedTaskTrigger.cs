@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -11,17 +12,17 @@ namespace Dexih.Utils.ManagedTasks
     /// This can then be called to provide the NextTrigger, which is the next date/time the execution should occur.
     /// </summary>
     [DataContract]
-    public class ManagedTaskSchedule
+    public class ManagedTaskTrigger
     {
        
 
-        public ManagedTaskSchedule() { }
+        public ManagedTaskTrigger() { }
 
         /// <summary>
         /// Create a trigger that starts at the specified time and executes once.
         /// </summary>
         /// <param name="startAt">Start At Date</param>
-        public ManagedTaskSchedule(DateTime startAt)
+        public ManagedTaskTrigger(DateTime startAt)
         {
             IntervalType = EIntervalType.Once;
             StartDate = startAt.Date;
@@ -33,8 +34,9 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         /// <param name="intervalTime">Interval time</param>
         /// <param name="maxRecurs">Maximum number of recurrences</param>
-        public ManagedTaskSchedule(TimeSpan intervalTime, int maxRecurs)
+        public ManagedTaskTrigger(TimeSpan intervalTime, int maxRecurs)
         {
+            StartTime = DateTime.Now.TimeOfDay.Add(TimeSpan.FromSeconds(1));
             IntervalTime = intervalTime;
             MaxRecurs = maxRecurs;
         }
@@ -108,7 +110,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Maximum number of times the schedule recurs.  If null or -1, this will be infinite.
         /// </summary>
         [DataMember(Order = 11)]
-        public int? MaxRecurs { get; set; }
+        public int? MaxRecurs { get; set; } = 1;
 
 
         private string _details;
@@ -364,6 +366,11 @@ namespace Dexih.Utils.ManagedTasks
             {
                 throw new ManagedTaskTriggerException(this, "The daily end time is after the daily start time.");
             }
+            
+            if (MaxRecurs > 1 && (IntervalTime == null || IntervalTime == TimeSpan.Zero))
+            {
+                throw new ManagedTaskTriggerException(this, "The interval time must be set to a non-null/non-zero value.");
+            }
 
             //loop through until we find a valid date.
             var validDateCounter = 0;
@@ -387,19 +394,8 @@ namespace Dexih.Utils.ManagedTasks
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
             {
-                if (IntervalTime == null || IntervalTime == TimeSpan.Zero)
-                {
-                    throw new ManagedTaskTriggerException(this, "The interval time must be set to a non-null/non-zero value.");
-//                    if (startAt.TimeOfDay < fromDate.TimeOfDay)
-//                    {
-//                        startAt = startAt.Date.Add(fromDate.TimeOfDay);
-//                    }
-                }
-                else
-                {
-                    startAt = startAt.Add(IntervalTime.Value);
-                }
-
+                startAt = startAt.Add(IntervalTime.Value);
+                
                 if (startAt > EndDate + dailyEnd)
                 {
                     return null;

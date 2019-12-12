@@ -109,7 +109,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         {
             var managedTasks = new ManagedTasks.ManagedTasks();
             
-            var trigger = new ManagedTaskSchedule(TimeSpan.Zero, 5);
+            var trigger = new ManagedTaskTrigger(TimeSpan.Zero, 5);
             var triggers = new[] {trigger};
             var progressTask = new ProgressTask(200 ,5);
             Assert.Throws<ManagedTaskTriggerException>(() =>
@@ -439,7 +439,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var currentDate = DateTime.Now;
 
             // set a trigger 5 seconds in the future
-            var trigger = new ManagedTaskSchedule()
+            var trigger = new ManagedTaskTrigger()
             {
                 StartDate = currentDate,
                 StartTime = currentDate.AddSeconds(5).TimeOfDay,
@@ -481,7 +481,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             managedTasks.OnStatus += OnSchedule;
 
             // starts in 1 second, then runs 1 second job
-            var trigger = new ManagedTaskSchedule()
+            var trigger = new ManagedTaskTrigger()
             {
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(1).TimeOfDay,
@@ -521,7 +521,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             managedTasks.OnStatus += OnSchedule;
 
             // starts in 1 second, then runs 1 second job
-            var trigger = new ManagedTaskSchedule()
+            var trigger = new ManagedTaskTrigger()
             {
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(1).TimeOfDay,
@@ -551,8 +551,6 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         {
             var managedTasks = new ManagedTasks.ManagedTasks();
             
-            var startTime = DateTime.Now.TimeOfDay;
-
             // simple task that takes 1 second to run
             var managedObject = new ProgressTask(1000, 1);
             
@@ -569,7 +567,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             managedTasks.OnStatus += OnSchedule;
 
             // starts in 1 second, then runs 1 second job
-            var trigger = new ManagedTaskSchedule()
+            var trigger = new ManagedTaskTrigger()
             {
                 StartDate = DateTime.Now,
                 StartTime = DateTime.Now.AddSeconds(100).TimeOfDay,
