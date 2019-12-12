@@ -440,8 +440,8 @@ namespace Dexih.Utils.ManagedTasks
                                 Exception = o.Exception;
                                 Success = false;
                                 EndTime = DateTime.Now;
-                                SetStatus(EManagedTaskStatus.Error);
                                 Percentage = 100;
+                                SetStatus(EManagedTaskStatus.Error);
                                 break;
                             default:
                                 Message = "Task failed with status " + o.Status + ".  Message:" + (o.Exception?.Message??"No Message");
@@ -461,8 +461,8 @@ namespace Dexih.Utils.ManagedTasks
                 Message = ex.Message;
                 Exception = ex;
                 Success = false;
-                SetStatus(EManagedTaskStatus.Error);
                 Percentage = 100;
+                SetStatus(EManagedTaskStatus.Error);
             }
         }
 

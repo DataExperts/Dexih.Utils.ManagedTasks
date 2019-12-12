@@ -324,6 +324,8 @@ namespace Dexih.Utils.ManagedTasks
 							break;
 					}
 
+					OnStatus?.Invoke(managedTask, newStatus);
+
 					// if the status is finished update the queues
 					if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled ||
 					    newStatus == EManagedTaskStatus.Error)
@@ -356,11 +358,6 @@ namespace Dexih.Utils.ManagedTasks
 						UpdateRunningQueue();
 
 						ReStartTask(managedTask);
-						OnStatus?.Invoke(managedTask, newStatus);
-					}
-					else
-					{
-						OnStatus?.Invoke(managedTask, newStatus);
 					}
 				}
 

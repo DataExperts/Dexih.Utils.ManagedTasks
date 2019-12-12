@@ -301,11 +301,11 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
                 var managedTask = new ErrorTask();
                 
-                void ErrorResult(object sender, EManagedTaskStatus status)
+                void ErrorResult(ManagedTask task, EManagedTaskStatus status)
                 {
                     if (status == EManagedTaskStatus.Error)
                     {
-                        Assert.True(((ManagedTask)sender).Exception != null);
+                        Assert.True(task.Exception != null);
                         Interlocked.Increment(ref errorCount);
                     }
                 }
