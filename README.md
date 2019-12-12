@@ -9,17 +9,18 @@
 [dex]: https://dataexpertsgroup.com
 
 [![][dex-img]][dex]
+
 [![Build status][build-img]][build] [![Nuget][nuget-img]][nuget]
 
-The `Managed` library is for scheduling and executing multiple tasks within a .net core application.
+The `ManagedTasks` library is a simple and flexible library for scheduling and executing multiple tasks within a .net application.
 
 The primary benefits:
 
- * Can run large number of simultaneous tasks.
- * Allows tasks to provide progress.
- * Allows tasks to be cancelled.
- * Allows tasks to be schedule once off, and on a recurring schedule.
- * Allows tasks to be started based on a file watcher event.
+ * Run a large number of simultaneous tasks.
+ * Allow tasks to provide progress.
+ * Allow tasks to be cancelled.
+ * Allow tasks to be schedule once off, and on a recurring schedule.
+ * Allow tasks to be started based on a file watcher event.
  * Start a task when one or more tasks complete.
  * Get a tasks status snapshot
 
@@ -272,4 +273,59 @@ public class CustomTask : ManagedObject
 
 ## Task Management
 
-The 
+The `ManagedLibrary` has a number of methods and properties that can be used to manage tasks.
+
+The following examples show how to interact with the managed tasks.
+
+```csharp
+var managedTasks = new ManagedTasks();
+
+//
+// add tasks to schedule
+//
+
+// iterate through active tasks (includes running, scheduled)
+foreach(var managedTask in managedTasks)
+{
+    // review task
+}
+
+// iterate through all scheduled (but not running tasks)
+foreach(var managedTask in managedTasks.GetScheduledTasks())
+{
+    // review task
+}
+
+// iterate through all running tasks
+foreach(var managedTask in managedTasks.GetRunningTasks())
+{
+    // review task
+}
+
+// iterate through all completed tasks
+foreach(var managedTask in managedTasks.GetCompletedTasks())
+{
+    // review task
+}
+
+// iterate through all tasks which changed status since last call
+foreach(var managedTask in managedTasks.GetTaskChanges())
+{
+    // review task
+}
+
+
+// cancel all tasks
+await CancelAsync();
+
+
+// wait for all active tasks to finish
+await managedTasks.WhenAll();
+
+```
+## Issues and Feedback
+
+This library is provided free of charge under the MIT licence and is actively maintained by the [Data Experts Group](https://dataexpertsgroup.com)
+
+Raise issues or bugs through the issues section of the git hub repository ([here](https://github.com/DataExperts/Dexih.Utils.ManagedTasks/issues))
+
