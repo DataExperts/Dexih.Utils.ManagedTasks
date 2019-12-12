@@ -22,7 +22,7 @@ test_script:
   - appveyor-retry dotnet restore -v Minimal
   - dotnet test -c %CONFIGURATION% .\test\Dexih.Utils.ManagedTasks.Tests\
 artifacts:
-  - path: artifacts\Dexih.Utils.ManagedTasks*.nupkg
+  - path: artifacts\Dexih.Utils.ManagedTasks.nupkg
 deploy:
  - provider: NuGet
    server: https://www.nuget.org/api/v2/package
@@ -48,8 +48,6 @@ for:
   - appveyor-retry dotnet restore -v Minimal
   - dotnet build -c %CONFIGURATION%
   - dotnet pack -c %CONFIGURATION% --no-build /p:Version=%APPVEYOR_BUILD_VERSION% -o ../../artifacts
-  - del .\artifacts\*test*
-  - del .\artifacts\*Example*
   
 # test branch produces a nuget package with the version suffix added.
 -
@@ -62,8 +60,6 @@ for:
   - appveyor-retry dotnet restore -v Minimal
   - dotnet build -c %CONFIGURATION%
   - dotnet pack -c %CONFIGURATION% --no-build /p:Version=%APPVEYOR_BUILD_VERSION%-ALPHA -o ../../artifacts
-  - del .\artifacts\*test*
-  - del .\artifacts\*Example*
   
 # master and dev branchs runs test only, no publishing packages
 -
