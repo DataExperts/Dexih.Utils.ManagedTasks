@@ -15,12 +15,13 @@ namespace Dexih.Utils.ManagedTasks
     {
         public event StatusDelegate OnStatus;
         public delegate void StatusDelegate(ManagedTask managedTask, EManagedTaskStatus status);
-        public event Progress OnProgress;
-        public delegate void Progress(ManagedTask managedTask, ManagedTaskProgressItem managedTaskProgressItem);
+        public event ProgressDelegate OnProgress;
+        public delegate void ProgressDelegate(ManagedTask managedTask, ManagedTaskProgressItem managedTaskProgressItem);
 
-        public event EventHandler? OnTrigger;
-        public event EventHandler? OnSchedule;
-        public event EventHandler? OnFileWatch;
+        public delegate void TaskDelegate(ManagedTask managedTask);
+        public event TaskDelegate OnTrigger;
+        public event TaskDelegate OnSchedule;
+        public event TaskDelegate OnFileWatch;
 
         /// <summary>
         /// Used to store changes
@@ -37,13 +38,13 @@ namespace Dexih.Utils.ManagedTasks
         
         [JsonIgnore]
         [IgnoreDataMember]
-        public Exception? Exception { get; set; }
+        public Exception Exception { get; set; }
 
         /// <summary>
         /// Unique key used to reference the task
         /// </summary>
         [DataMember(Order = 3)]
-        public string Reference { get; set; }
+        public string TaskId { get; set; }
         
         /// <summary>
         /// Id that reference the originating client of the task.
@@ -146,7 +147,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Array of task reference which must be complete prior to this task.
         /// </summary>
         [DataMember(Order = 23)]
-        public string[] DependentReferences { get; set; }
+        public string[] DependentTaskIds { get; set; }
 
 
         private bool _dependenciesMet;
@@ -157,7 +158,7 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         [DataMember(Order = 24)]
         public bool DependenciesMet {
-            get => _dependenciesMet || DependentReferences == null || DependentReferences.Length == 0;
+            get => _dependenciesMet || DependentTaskIds == null || DependentTaskIds.Length == 0;
             set => _dependenciesMet = value;
         }
         
@@ -176,7 +177,7 @@ namespace Dexih.Utils.ManagedTasks
         }
         
         // The data object is used to pass data when the managedTask is serialized.
-        private object? _data;
+        private object _data;
         
         private readonly CancellationTokenSource _cancellationTokenSource;
 
@@ -255,7 +256,7 @@ namespace Dexih.Utils.ManagedTasks
                 throw new ManagedTaskException("The task cannot be scheduled as the status is already set to " + Status);
             }
 
-            var allowSchedule = DependentReferences != null && DependentReferences.Length > 0 && DependenciesMet && RunCount == 0;
+            var allowSchedule = DependentTaskIds != null && DependentTaskIds.Length > 0 && DependenciesMet && RunCount == 0;
 
             // if the file watchers are not set, then set them.
             if (FileWatchers != null && FileWatchers.Any())
@@ -270,7 +271,7 @@ namespace Dexih.Utils.ManagedTasks
                 }
                 
                 SetStatus(EManagedTaskStatus.FileWatching);
-                OnFileWatch?.Invoke(this, EventArgs.Empty);
+                OnFileWatch?.Invoke(this);
                 allowSchedule = true;
             }
             
@@ -311,7 +312,7 @@ namespace Dexih.Utils.ManagedTasks
                     }
                     
                     SetStatus(EManagedTaskStatus.Scheduled);
-                    OnSchedule?.Invoke(this, EventArgs.Empty);
+                    OnSchedule?.Invoke(this);
                 }
             }
 
@@ -356,7 +357,7 @@ namespace Dexih.Utils.ManagedTasks
                 }
                 else
                 {
-                    OnTrigger?.Invoke(this, EventArgs.Empty);
+                    OnTrigger?.Invoke(this);
                 }
             } 
         }
@@ -372,7 +373,7 @@ namespace Dexih.Utils.ManagedTasks
                 }
                 else
                 {
-                    OnTrigger?.Invoke(this, EventArgs.Empty);
+                    OnTrigger?.Invoke(this);
                 }
             }
         }
@@ -591,7 +592,7 @@ namespace Dexih.Utils.ManagedTasks
                 Message = Message,
                 Name = Name,
                 Percentage = Percentage,
-                Reference = Reference,
+                TaskId = TaskId,
                 Status = Status,
                 Success = Success,
                 CategoryKey = CategoryKey,

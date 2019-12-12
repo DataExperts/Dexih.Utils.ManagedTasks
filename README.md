@@ -16,13 +16,15 @@ The `ManagedTasks` library is a simple and flexible library for scheduling and e
 
 The primary benefits:
 
- * Run a large number of simultaneous tasks.
+ * Orchestrate a large number of simultaneous tasks.
  * Allow tasks to provide progress.
  * Allow tasks to be cancelled.
  * Allow tasks to be schedule once off, and on a recurring schedule.
  * Allow tasks to be started based on a file watcher event.
  * Start a task when one or more tasks complete.
- * Get a tasks status snapshot
+ * Tasks can run sequentially or in parallel.
+ * Get snapshots of running and completed tasks
+ * Events to provide task status changes.
 
 ---
 
@@ -83,7 +85,7 @@ var countTask = new CountTask();
 Console.WriteLine("Run one task.");
 managedTasks.Add(new ManagedTask()
 {
-    Reference = Guid.NewGuid().ToString(),
+    TaskId = Guid.NewGuid().ToString(),
     Name = "count to 5",
     ManagedObject = countTask
 });
@@ -118,7 +120,7 @@ To use a trigger, add it to the `Triggers` property of the `ManagedTask`.
 ```csharp
 var managedTask = new ManagedTask()
 {
-    Reference = Guid.NewGuid().ToString(),
+    TaskId = Guid.NewGuid().ToString(),
     Name = "count to 5",
     ManagedObject = countTask,
     Triggers = new [] { new ManagedTaskTrigger(TimeSpan.FromSeconds(6), 2)}
@@ -154,7 +156,7 @@ var fileWatch = new ManagedTaskFileWatcher('/data/', "trigger_file_*");
 
 var managedTask = new ManagedTask()
 {
-    Reference = Guid.NewGuid().ToString(),
+    TaskId = Guid.NewGuid().ToString(),
     Name = "start on file",
     ManagedObject = countTask,
     FileWatchers = new [] { fileWatch }
@@ -176,7 +178,7 @@ var managedTasks = new ManagedTasks();
 
 var task1 = new ManagedTask
 {
-    Reference = Guid.NewGuid().ToString(),
+    TaskId = Guid.NewGuid().ToString(),
     Name = "test",
     Category = "category",
     CategoryKey = 1,
@@ -186,7 +188,7 @@ var task1 = new ManagedTask
 
 var task2 = new ManagedTask
 {
-    Reference = Guid.NewGuid().ToString(),
+    TaskId = Guid.NewGuid().ToString(),
     Name = "test",
     Category = "category",
     CategoryKey = 1,
@@ -204,7 +206,7 @@ await managedTasks.WhenAll();
 
 Tasks can be executed based on the outcome of another task or tasks.
 
-In order to set dependent tasks on a task use the `DependentReferences` property to specify the `Reference` of the dependent tasks.
+In order to set dependent tasks on a task use the `DependentTaskIds` property to specify the `TaskId` of the dependent tasks.
 
 The following example will run task1 until completion, and then task2.
 
@@ -213,17 +215,17 @@ var managedTasks = new ManagedTasks();
 
 managedTasks.Add(new ManagedTask()
 {
-    Reference = "ref1",
+    TaskId = "ref1",
     Name = "task1",
     ManagedObject = countTask
 });
 
 managedTasks.Add(new ManagedTask()
 {
-    Reference = "ref2",
+    TaskId = "ref2",
     Name = "task2",
     ManagedObject = countTask,
-    DependentReferences = new []{"ref1"}
+    DependentTaskIds = new []{"ref1"}
 });
 
 await managedTasks.WhenAll();
@@ -323,6 +325,41 @@ await CancelAsync();
 await managedTasks.WhenAll();
 
 ```
+
+## Managed Task Properties
+
+The `ManagedTask` class is used by the managed tasks.  The class has the following properties which should be set prior to starting the task.
+
+|Property|Description|
+|-|-|
+|TaskId|A unique id representing the task.|
+|Name|A name for the task|
+|Description|Any description for the task|
+|Category|A category used to group tasks types.|
+|CategoryKey|A key used to determine related tasks when using the ConcurrentAction setting.
+|ConcurrentTaskAction|Concurrency option when starting more than one task that has the same Category/CategoryKey.  The options are Abend - throws exception, Parallel - runs in parallel, and Sequential - waits for related task to complete first.
+|Triggers|An array containing the `ManagedTaskTrigger` which determine the schedule fo the task.
+|FileWatchers|An array containing the `ManagedTaskFileWatcher`
+|DependentTaskIds|
+|ManagedObject|A reference to an instance of a class derived from `ManagedObject`.  This contains the task logic to execute.
+|Data|Object which can be use to pack any required data onto the task|
+|ReferenceKey|Long which can be used for any purpose|
+|ReferenceId|String which can be used for any purpose|
+
+The following properties should not be manually changed, however can be used to determine the status of a task.
+
+|Property|Description|
+|-|-|
+|Status|The current status of the task.  Valid status' are Created, FileWatching, Scheduled, Queued, Running, Cancelled, Error, Completed|
+|Percentage|The percentage complete the task is.  This is set through the `ManagedTaskProgress` class passed to the `StartAsync` function in the `ManagedObject`.
+|Counter|A counter which can be used to indicate progress.  This is update through the `ManagedTaskProgress` class.
+|StepName|A string value which be used to indicate progress.  This is update through the `ManagedTaskProgress` class.
+|StartTime|Date/Time the task started|
+|EndTime|Date/Time the task finished|
+|NextTriggerTime|The date/time the task will be next triggered.
+|RunCount|The number of times the task has been run
+
+
 ## Issues and Feedback
 
 This library is provided free of charge under the MIT licence and is actively maintained by the [Data Experts Group](https://dataexpertsgroup.com)

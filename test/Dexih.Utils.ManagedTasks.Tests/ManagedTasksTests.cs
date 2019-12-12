@@ -47,7 +47,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             {
                 var task = new ManagedTask()
                 {
-                    Reference = Guid.NewGuid().ToString(),
+                    TaskId = Guid.NewGuid().ToString(),
                     CategoryKey = i,
                     Name = "task",
                     Category = "123",
@@ -160,7 +160,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             
             var task1 = new ManagedTask
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 OriginatorId = "task",
                 Name = "test",
                 Category = "category",
@@ -170,13 +170,13 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 ManagedObject =  new ProgressTask(20, 1),
                 Triggers = null,
                 FileWatchers = null,
-                DependentReferences = null,
+                DependentTaskIds = null,
                 ConcurrentTaskAction = EConcurrentTaskAction.Sequence
             };
             
             var task2 = new ManagedTask
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 OriginatorId = "task",
                 Name = "test",
                 Category = "category",
@@ -186,7 +186,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 ManagedObject =  new ProgressTask(0, 1),
                 Triggers = null,
                 FileWatchers = null,
-                DependentReferences = null,
+                DependentTaskIds = null,
                 ConcurrentTaskAction = concurrentTaskAction
             };
 
@@ -393,8 +393,8 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             // run task1, then task2, then task 3 
             var task1 = managedTasks.Add("123", "task1", "test", managedObject, null);
-            var task2 = managedTasks.Add("123", "task2", "test", managedObject, null, new[] { task1.Reference });
-            var task3 = managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task2.Reference });
+            var task2 = managedTasks.Add("123", "task2", "test", managedObject, null, new[] { task1.TaskId });
+            var task3 = managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task2.TaskId });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
@@ -417,7 +417,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             // run task1 & task2 parallel, then task 3 when both finish
             var task1 = managedTasks.Add("123", "task1", "test", managedObject, null);
             var task2 = managedTasks.Add("123", "task2", "test", managedObject, null);
-            var task3 = managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task1.Reference, task2.Reference });
+            var task3 = managedTasks.Add("123", "task3", "test", managedObject, null, new[] { task1.TaskId, task2.TaskId });
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);

@@ -17,7 +17,7 @@ namespace TaskWithProgress
             Console.WriteLine("Run one task.");
             managedTasks.Add(new ManagedTask()
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 Name = "count to 5",
                 ManagedObject = countTask
             });
@@ -29,7 +29,7 @@ namespace TaskWithProgress
             Console.WriteLine("Run task in 5 seconds.");
             managedTasks.Add(new ManagedTask()
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 Name = "count to 5",
                 ManagedObject = countTask,
                 Triggers = new []{new ManagedTaskTrigger(DateTime.Now.AddSeconds(5))}
@@ -42,7 +42,7 @@ namespace TaskWithProgress
             Console.WriteLine("Run task 2 times.");
             managedTasks.Add(new ManagedTask()
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 Name = "count to 5",
                 ManagedObject = countTask,
                 Triggers = new [] { new ManagedTaskTrigger(TimeSpan.FromSeconds(6), 2)}
@@ -55,14 +55,14 @@ namespace TaskWithProgress
             Console.WriteLine("Run two tasks in parallel.");
             managedTasks.Add(new ManagedTask()
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 Name = "task1",
                 ManagedObject = countTask
             });
 
             managedTasks.Add(new ManagedTask()
             {
-                Reference = Guid.NewGuid().ToString(),
+                TaskId = Guid.NewGuid().ToString(),
                 Name = "task2",
                 ManagedObject = countTask
             });
@@ -72,17 +72,17 @@ namespace TaskWithProgress
             Console.WriteLine("Run two tasks in sequence.");
             managedTasks.Add(new ManagedTask()
             {
-                Reference = "ref1",
+                TaskId = "ref1",
                 Name = "task1",
                 ManagedObject = countTask
             });
 
             managedTasks.Add(new ManagedTask()
             {
-                Reference = "ref2",
+                TaskId = "ref2",
                 Name = "task2",
                 ManagedObject = countTask,
-                DependentReferences = new []{"ref1"}
+                DependentTaskIds = new []{"ref1"}
             });
 
             await managedTasks.WhenAll();
