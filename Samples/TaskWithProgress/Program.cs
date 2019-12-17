@@ -5,9 +5,9 @@ using Dexih.Utils.ManagedTasks;
 
 namespace TaskWithProgress
 {
-    static class Program
+    class Program
     {
-        static async Task Main(string[] args)
+        static async Task Main(string[] args)  
         {
             var managedTasks = new ManagedTasks();
             managedTasks.OnProgress += Progress;

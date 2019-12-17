@@ -5,7 +5,7 @@
 [nuget]:     https://www.nuget.org/packages/Dexih.Utils.ManagedTasks
 [nuget-img]: https://badge.fury.io/nu/Dexih.Utils.ManagedTasks.svg
 [nuget-name]: Dexih.Utils.ManagedTasks
-[dex-img]: http://dataexpertsgroup.com/assets/img/dex_web_logo.png
+[dex-img]: https://dataexpertsgroup.com/assets/img/dex_web_logo.png
 [dex]: https://dataexpertsgroup.com
 
 [![][dex-img]][dex]
