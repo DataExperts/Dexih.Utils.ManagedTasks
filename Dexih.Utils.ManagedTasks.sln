@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dexih.Utils.ManagedTasks", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskWithProgress", "Samples\TaskWithProgress\TaskWithProgress.csproj", "{A57DA474-7556-4670-BEEA-8A7FFBC1A83A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManagedTaskDemo", "Samples\ManagedTaskDemo\ManagedTaskDemo.csproj", "{F8E8D2FC-780D-42BD-9197-FC303726F3F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{A57DA474-7556-4670-BEEA-8A7FFBC1A83A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A57DA474-7556-4670-BEEA-8A7FFBC1A83A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A57DA474-7556-4670-BEEA-8A7FFBC1A83A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8E8D2FC-780D-42BD-9197-FC303726F3F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8E8D2FC-780D-42BD-9197-FC303726F3F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8E8D2FC-780D-42BD-9197-FC303726F3F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8E8D2FC-780D-42BD-9197-FC303726F3F2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

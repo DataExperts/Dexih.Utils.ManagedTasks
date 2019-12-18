@@ -118,7 +118,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                     triggers, null, null);
             });
 
-            Assert.Equal(0, managedTasks.GetActiveTasks().Count());
+            Assert.Empty(managedTasks.GetActiveTasks());
         }
 
         [Fact]
@@ -495,7 +495,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
 
-            Assert.ThrowsAsync<ManagedTaskTriggerException>(async () => await managedTasks.WhenAll(cts.Token));
+            await Assert.ThrowsAsync<ManagedTaskTriggerException>(async () => await managedTasks.WhenAll(cts.Token));
         }
         
         [Fact]
