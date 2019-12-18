@@ -4,10 +4,10 @@
     <LangVersion>8</LangVersion>
     <Nullable>disable</Nullable>
     <PackageId>Dexih.Utils.ManagedTasks</PackageId>
-    <Description>Task scheduler and manager library.  See the project url for more details.</Description>
+    <Description>A simple and flexible library for scheduling and executing multiple concurrent tasks within a .net application.</Description>
     <AssemblyTitle>Data Experts Group - Managed Tasks</AssemblyTitle>
     <Authors>Gary Holland</Authors>
-    <PackageTags>scheduler;task;tasks;process;file watch;async</PackageTags>
+    <PackageTags>schedule;async;service;scheduler;task;tasks;process;file watch;async</PackageTags>
     <PackageReleaseNotes>Refer to the project url (https://github.com/DataExperts/Dexih.Utils.ManagedTasks) for documentation and raising issues</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/DataExperts/Dexih.Utils.ManagedTasks</PackageProjectUrl>
   </PropertyGroup>
