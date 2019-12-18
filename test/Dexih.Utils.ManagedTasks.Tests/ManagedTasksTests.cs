@@ -425,7 +425,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
 
             // job should take 10 seconds.
-            Assert.True(timer.Elapsed.Seconds >= 10 && timer.Elapsed.Seconds <= 11, $"Took {timer.Elapsed.Seconds} should take 10 seconds.");
+            Assert.True(timer.Elapsed.Seconds >= 9 && timer.Elapsed.Seconds <= 11, $"Took {timer.Elapsed.Seconds} should take 10 seconds.");
         }
 
         [Fact]
@@ -495,7 +495,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var cts = new CancellationTokenSource();
             cts.CancelAfter(30000);
 
-            await Assert.ThrowsAsync<ManagedTaskTriggerException>(async () => await managedTasks.WhenAll(cts.Token));
+            Assert.ThrowsAsync<ManagedTaskTriggerException>(async () => await managedTasks.WhenAll(cts.Token));
         }
         
         [Fact]
