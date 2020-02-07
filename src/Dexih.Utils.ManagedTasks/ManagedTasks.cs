@@ -720,7 +720,6 @@ namespace Dexih.Utils.ManagedTasks
         public void Dispose()
         {
 			_statusChangeQueue.CompleteAdding();
-			_statusChangeQueue.Dispose();
 			_statusChangeThread.Join(1500);
             OnProgress = null;
             OnStatus = null;
