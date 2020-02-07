@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -361,6 +362,8 @@ namespace Dexih.Utils.ManagedTasks
 					}
 				}
 
+				Debug.WriteLine("The processing is complete.");
+
 			}
 			catch (Exception ex)
 			{
@@ -716,7 +719,9 @@ namespace Dexih.Utils.ManagedTasks
 
         public void Dispose()
         {
-	        _statusChangeThread.Join(1500);
+			_statusChangeQueue.CompleteAdding();
+			_statusChangeQueue.Dispose();
+			_statusChangeThread.Join(1500);
             OnProgress = null;
             OnStatus = null;
         }
