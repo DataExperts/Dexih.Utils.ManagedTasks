@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Extensions.Logging;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -12,6 +13,12 @@ namespace Dexih.Utils.ManagedTasks
         public ManagedTaskException(string message) : base(message)
         {
         }
+
+        public ManagedTaskException(ILogger logger, string message) : base(message)
+        {
+            logger?.LogError(message);
+        }
+
         public ManagedTaskException(string message, Exception innerException) : base(message, innerException)
         {
         }

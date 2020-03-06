@@ -2,11 +2,13 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -23,6 +25,7 @@ namespace Dexih.Utils.ManagedTasks
 		public delegate void Progress(ManagedTask managedTask, ManagedTaskProgressItem managedTaskProgressItem);
 		
 		private readonly int _maxConcurrent;
+		private readonly ILogger _logger;
 		
 		private long _createdCount;
 		private long _scheduledCount;
@@ -76,9 +79,10 @@ namespace Dexih.Utils.ManagedTasks
 
 		private readonly object _taskAddLock = 1;
 		
-		public ManagedTasks(int maxConcurrent = 100)
+		public ManagedTasks(int maxConcurrent = 100, ILogger logger = default)
 		{
 			_maxConcurrent = maxConcurrent;
+			_logger = logger;
 
 			_activeTasks = new ConcurrentDictionary<string, ManagedTask>();
 			_completedTasks = new ConcurrentDictionary<(string, long), ManagedTask>();
@@ -95,6 +99,11 @@ namespace Dexih.Utils.ManagedTasks
 
 		public ManagedTask Add(ManagedTask managedTask)
 		{
+			if (managedTask == null)
+			{
+				_logger?.LogCritical($"Invalid managed task equal to null.");
+				throw new NullReferenceException();
+			}
 
 			if (!string.IsNullOrEmpty(managedTask.Category) && managedTask.CategoryKey > 0 &&
 			    ContainsKey(managedTask.Category, managedTask.CategoryKey))
@@ -104,7 +113,7 @@ namespace Dexih.Utils.ManagedTasks
 					case EConcurrentTaskAction.Parallel:
 						break;
 					case EConcurrentTaskAction.Abend:
-						throw new ManagedTaskException(
+						throw new ManagedTaskException(_logger, 
 							$"The {managedTask.Category} - {managedTask.Name} (key {managedTask.CategoryKey}) is already active and cannot be run at the same time.");
 					case EConcurrentTaskAction.Sequence:
 						var depTasks = GetTasks(managedTask.Category, managedTask.CategoryKey);
@@ -120,6 +129,7 @@ namespace Dexih.Utils.ManagedTasks
 
 						break;
 					default:
+						_logger?.LogCritical($"Invalid concurrent task action {managedTask.ConcurrentTaskAction}.");
 						throw new ArgumentOutOfRangeException();
 				}
 			}
@@ -129,7 +139,7 @@ namespace Dexih.Utils.ManagedTasks
 
 			if (!_activeTasks.TryAdd(managedTask.TaskId, managedTask))
 			{
-				throw new ManagedTaskException("Failed to add the task to the active tasks list.");
+				throw new ManagedTaskException(_logger, "Failed to add the task to the active tasks list.");
 			}
 
 			try
@@ -158,7 +168,7 @@ namespace Dexih.Utils.ManagedTasks
 					{
 						if (managedTask.DependentTaskIds == null || managedTask.DependentTaskIds.Length == 0)
 						{
-							throw new ManagedTaskException(
+							throw new ManagedTaskException(_logger, 
 								"The task could not be started as none of the triggers returned a future schedule time.");
 						}
 					}
@@ -168,10 +178,15 @@ namespace Dexih.Utils.ManagedTasks
 
 				return managedTask;
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
 				_activeTasks.TryRemove(managedTask.TaskId, out var _);
 				managedTask.Dispose();
+
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Unknown error adding managed task: " + ex.Message);
+				}
 				throw;
 			}
 		}
@@ -275,6 +290,10 @@ namespace Dexih.Utils.ManagedTasks
 
         private void StatusChange(ManagedTask managedTask, EManagedTaskStatus newStatus)
         {
+	        if (newStatus == EManagedTaskStatus.Error)
+	        {
+		        _logger?.LogWarning(managedTask.Exception, $"The task {managedTask.Name} with id {managedTask.TaskId} returned an error status.  {managedTask.Exception?.Message} ");
+	        }
 	        _statusChangeQueue.Add((newStatus, managedTask));
         }
 
@@ -336,7 +355,7 @@ namespace Dexih.Utils.ManagedTasks
 							if (!_runningTasks.TryRemove(managedTask.TaskId, out var _))
 							{
 								_exitException =
-									new ManagedTaskException(
+									new ManagedTaskException(_logger, 
 										"Failed to remove the task from the running tasks list.");
 								SetException(_exitException);
 								return;
@@ -349,7 +368,7 @@ namespace Dexih.Utils.ManagedTasks
 							if (!_scheduledTasks.TryRemove(managedTask.TaskId, out var _))
 							{
 								_exitException =
-									new ManagedTaskException(
+									new ManagedTaskException(_logger, 
 										"Failed to remove the task from the scheduled tasks list.");
 								SetException(_exitException);
 								return;
@@ -367,6 +386,10 @@ namespace Dexih.Utils.ManagedTasks
 			}
 			catch (Exception ex)
 			{
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Error processing status change: " + ex.Message);
+				}
 				_exitException = ex;
 				_statusChangeQueue.CompleteAdding();
 				SetException(_exitException);
@@ -376,23 +399,36 @@ namespace Dexih.Utils.ManagedTasks
 
 		private void Schedule(string reference)
 		{
-			var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
-			if (!taskFound)
+			try
 			{
-				throw new ManagedTaskException("Failed to schedule the task as it could not be found in the active task list.");
-			}
+				var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
+				if (!taskFound)
+				{
+					throw new ManagedTaskException(_logger,
+						"Failed to schedule the task as it could not be found in the active task list.");
+				}
 
-			// StatusChange(managedTask, managedTask.Status);
+				// StatusChange(managedTask, managedTask.Status);
 
-			// if the task was triggered previously, then start it.
-			if (managedTask.CheckPreviousTrigger())
-			{
-				Start(managedTask.TaskId);
+				// if the task was triggered previously, then start it.
+				if (managedTask.CheckPreviousTrigger())
+				{
+					Start(managedTask.TaskId);
+				}
+				else
+				{
+					managedTask.OnTrigger += Trigger;
+					_scheduledTasks.TryAdd(managedTask.TaskId, managedTask);
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				managedTask.OnTrigger += Trigger;
-				_scheduledTasks.TryAdd(managedTask.TaskId, managedTask);
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Error in schedule: " + ex.Message);
+				}
+
+				throw;
 			}
 		}
 
@@ -411,82 +447,110 @@ namespace Dexih.Utils.ManagedTasks
 				task.SetResult(value);
 			}
 		}
-		
+
 		private void Start(string reference)
 		{
-			var startTasks = new List<ManagedTask>();
-			
-			lock (_taskAddLock) // lock to ensure _runningTask.Count is consistent when adding the task
+			try
 			{
-				var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
-				if (!taskFound)
+				var startTasks = new List<ManagedTask>();
+
+				lock (_taskAddLock) // lock to ensure _runningTask.Count is consistent when adding the task
 				{
-					throw new ManagedTaskException($"Failed to start the task with reference {reference} as it could not be found in the active task list.");
-				}
-                
-				if (_runningTasks.Count < _maxConcurrent)
-				{
-					var tryAddTask = _runningTasks.TryAdd(managedTask.TaskId, managedTask);
-					if (!tryAddTask)
+					var taskFound = _activeTasks.TryGetValue(reference, out var managedTask);
+					if (!taskFound)
 					{
-						throw new ManagedTaskException("Failed to add the managed task to the running tasks queue.");
+						throw new ManagedTaskException(_logger,
+							$"Failed to start the task with reference {reference} as it could not be found in the active task list.");
 					}
 
-					startTasks.Add(managedTask);
+					if (_runningTasks.Count < _maxConcurrent)
+					{
+						var tryAddTask = _runningTasks.TryAdd(managedTask.TaskId, managedTask);
+						if (!tryAddTask)
+						{
+							throw new ManagedTaskException(_logger,
+								"Failed to add the managed task to the running tasks queue.");
+						}
+
+						startTasks.Add(managedTask);
+					}
+					else
+					{
+						_queuedTasks.Enqueue(managedTask);
+					}
 				}
-				else
+
+				foreach (var task in startTasks)
 				{
-					_queuedTasks.Enqueue(managedTask);
+					task.Start();
 				}
 			}
-			
-			foreach (var task in startTasks)
+			catch (Exception ex)
 			{
-				task.Start();
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Error in start task: " + ex.Message);
+				}
+
+				throw;
 			}
 		}
 
 		private void UpdateRunningQueue()
 		{
-			var startTasks = new List<ManagedTask>();
-	        
-            lock (_taskAddLock)
-            {
-                // update the running queue
-                while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
-                {
-                    if (!_queuedTasks.TryDequeue(out var queuedTask))
-                    {
-                        // something wrong with concurrency if this is hit.
-                        _exitException = new ManagedTaskException("Failed to remove the task from the queued tasks list.");
-                        SetException(_exitException);
-                        return;
-                    }
+			try
+			{
+				var startTasks = new List<ManagedTask>();
 
-                    // if the task is marked as cancelled just ignore it
-                    if (queuedTask.Status == EManagedTaskStatus.Cancelled)
-                    {
-                        // OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
-                        continue;
-                    }
+				lock (_taskAddLock)
+				{
+					// update the running queue
+					while (_runningTasks.Count < _maxConcurrent && _queuedTasks.Count > 0)
+					{
+						if (!_queuedTasks.TryDequeue(out var queuedTask))
+						{
+							// something wrong with concurrency if this is hit.
+							_exitException = new ManagedTaskException(_logger,
+								"Failed to remove the task from the queued tasks list.");
+							SetException(_exitException);
+							return;
+						}
 
-                    if (!_runningTasks.TryAdd(queuedTask.TaskId, queuedTask))
-                    {
-                        // something wrong with concurrency if this is hit.
-                        _exitException = new ManagedTaskException("Failed to add the task from the running tasks list.");
-                        SetException(_exitException);
-                        return;
-                    }
+						// if the task is marked as cancelled just ignore it
+						if (queuedTask.Status == EManagedTaskStatus.Cancelled)
+						{
+							// OnStatus?.Invoke(queuedTask, EManagedTaskStatus.Cancelled);
+							continue;
+						}
 
-                    startTasks.Add(queuedTask);
-                }
-            }
+						if (!_runningTasks.TryAdd(queuedTask.TaskId, queuedTask))
+						{
+							// something wrong with concurrency if this is hit.
+							_exitException = new ManagedTaskException(_logger,
+								"Failed to add the task from the running tasks list.");
+							SetException(_exitException);
+							return;
+						}
 
-            foreach (var task in startTasks)
-            {
-	            task.Start();
-            }
-        }
+						startTasks.Add(queuedTask);
+					}
+				}
+
+				foreach (var task in startTasks)
+				{
+					task.Start();
+				}
+			}
+			catch (Exception ex)
+			{
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Error updating the running queue: " + ex.Message);
+				}
+
+				throw;
+			}
+		}
 
         private void ReStartTask(ManagedTask managedTask)
         {
@@ -517,7 +581,7 @@ namespace Dexih.Utils.ManagedTasks
 			        if (!_activeTasks.TryRemove(managedTask.TaskId, out var activeTask))
 			        {
 				        _exitException =
-					        new ManagedTaskException("Failed to remove the task to the active tasks list.");
+					        new ManagedTaskException(_logger, "Failed to remove the task to the active tasks list.");
 				        SetException(_exitException);
 			        }
 
@@ -563,8 +627,13 @@ namespace Dexih.Utils.ManagedTasks
 			        SetResult(true);
 		        }
 	        }
-	        catch (Exception)
+	        catch (Exception ex)
 	        {
+		        if (!(ex is ManagedTaskException))
+		        {
+			        _logger?.LogCritical(ex, "Error restarting task: " + ex.Message);
+		        }
+		        
 		        _activeTasks.TryRemove(managedTask.TaskId, out var _);
 		        managedTask.Dispose();
 		        throw;
@@ -576,21 +645,31 @@ namespace Dexih.Utils.ManagedTasks
 			_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask, (oldKey, oldValue) => managedTask);
 			OnProgress?.Invoke(managedTask, progress);
 		}
-		
-		
-	   private void Trigger(object sender)
-        {
-//            lock (_triggerLock)
-//            {
-                var managedTask = (ManagedTask) sender;
-                var success = _scheduledTasks.TryRemove(managedTask.TaskId, out ManagedTask _);
-                if (success) // if the schedule task could not be removed, it is due to two simultaneous triggers occurring, so ignore.
-                {
-                    managedTask.DisposeTrigger(); //stop the trigger whilst the task is running.
-                    Start(managedTask.TaskId);
-                }
-//            }
-        }
+
+
+		private void Trigger(object sender)
+		{
+			try
+			{
+				var managedTask = (ManagedTask) sender;
+				var success = _scheduledTasks.TryRemove(managedTask.TaskId, out ManagedTask _);
+				if (success
+				) // if the schedule task could not be removed, it is due to two simultaneous triggers occurring, so ignore.
+				{
+					managedTask.DisposeTrigger(); //stop the trigger whilst the task is running.
+					Start(managedTask.TaskId);
+				}
+			}
+			catch (Exception ex)
+			{
+				if (!(ex is ManagedTaskException))
+				{
+					_logger?.LogCritical(ex, "Error triggering task: " + ex.Message);
+				}
+
+				throw;
+			}
+		}
 
 		public async Task WhenAll(CancellationToken cancellationToken = default)
 		{
@@ -604,6 +683,7 @@ namespace Dexih.Utils.ManagedTasks
 
 				if (_exitException != null)
 				{
+					_logger?.LogError(_exitException, "The task managed finished with an exception: " + _exitException.Message);
 					throw _exitException;
 				}
 
