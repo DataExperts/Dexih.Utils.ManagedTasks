@@ -22,6 +22,7 @@ namespace Dexih.Utils.ManagedTasks
         public ManagedTaskException(string message, Exception innerException) : base(message, innerException)
         {
         }
+        
     }
 
     public class ManagedTaskTriggerException: Exception

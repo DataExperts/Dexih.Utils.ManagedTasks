@@ -673,5 +673,36 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             Assert.True(startTime2.AddSeconds(5) < DateTime.Now && startTime2.AddSeconds(5.5) > DateTime.Now);
         }
 
+        [Fact]
+        public async Task Test_ManagedTask_ProgressError()
+        {
+            using (var managedTasks = new ManagedTasks.ManagedTasks())
+            {
+                var errorCount = 0;
+
+                var managedTask = new ProgressTask(1,5);
+                
+                void Progress(ManagedTask task, ManagedTaskProgressItem progress)
+                {
+                    throw new Exception("Failed");
+                }
+
+                // add the error task multiple times.
+                errorCount = 0;
+                managedTasks.OnProgress += Progress;
+
+                var t = managedTasks.Add("123", "task3", "test", managedTask, null);
+                await managedTasks.WhenAll();
+                
+                // Assert.True(t.Exception != null);
+
+                t = managedTasks.Add("123", "task3", "test", managedTask, null);
+                await managedTasks.WhenAll();
+                Assert.True(t.Exception != null);
+
+                PrintManagedTasksCounters(managedTasks);
+            }
+        }
+        
     }
 }

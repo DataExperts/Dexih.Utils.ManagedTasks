@@ -136,6 +136,7 @@ namespace Dexih.Utils.ManagedTasks
 
 			managedTask.OnStatus += StatusChange;
 			managedTask.OnProgress += ProgressChanged;
+			managedTask.Logger = _logger;
 
 			if (!_activeTasks.TryAdd(managedTask.TaskId, managedTask))
 			{
@@ -299,23 +300,27 @@ namespace Dexih.Utils.ManagedTasks
 
         private void ProcessStatusChanges()
 		{
-			try
+			// runs in a separate thread, and processes any status changes as they arrive.
+			foreach (var statusChange in _statusChangeQueue.GetConsumingEnumerable())
 			{
-				foreach (var statusChange in _statusChangeQueue.GetConsumingEnumerable())
+				try
 				{
 					var managedTask = statusChange.managedTask;
 					var newStatus = statusChange.status;
 
 					// if current status called multiple times, do not resend the event.
-					if (newStatus == managedTask.Status) continue;
+					if (newStatus == managedTask.Status)
+					{
+						continue;
+					}
 
 					var oldStatus = managedTask.Status;
 					managedTask.Status = newStatus;
 
 					//store most recent update
-					_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask,
-						(oldKey, oldValue) => managedTask);
+					_taskChangeHistory.AddOrUpdate(managedTask.ChangeId, managedTask, (oldKey, oldValue) => managedTask);
 
+					// update the appropriate status counter.
 					switch (newStatus)
 					{
 						case EManagedTaskStatus.Created:
@@ -344,7 +349,16 @@ namespace Dexih.Utils.ManagedTasks
 							break;
 					}
 
-					OnStatus?.Invoke(managedTask, newStatus);
+					// catch on-status updates to ensure external errors do not crash the managed tasks.
+					try
+					{
+						OnStatus?.Invoke(managedTask, newStatus);
+					}
+					catch (Exception ex)
+					{
+						managedTask.Error($"The task failed due to an error updating the status.", ex);
+						_logger.LogError(ex, $"The managed task {managedTask.Name} failed due to an error updating the status.  {ex.Message}");
+					}
 
 					// if the status is finished update the queues
 					if (newStatus == EManagedTaskStatus.Completed || newStatus == EManagedTaskStatus.Cancelled ||
@@ -355,21 +369,18 @@ namespace Dexih.Utils.ManagedTasks
 							if (!_runningTasks.TryRemove(managedTask.TaskId, out var _))
 							{
 								_exitException =
-									new ManagedTaskException(_logger, 
+									new ManagedTaskException(_logger,
 										"Failed to remove the task from the running tasks list.");
 								SetException(_exitException);
 								return;
 							}
 						}
 
-						if (oldStatus == EManagedTaskStatus.Scheduled ||
-						    oldStatus == EManagedTaskStatus.FileWatching)
+						if (oldStatus == EManagedTaskStatus.Scheduled || oldStatus == EManagedTaskStatus.FileWatching)
 						{
 							if (!_scheduledTasks.TryRemove(managedTask.TaskId, out var _))
 							{
-								_exitException =
-									new ManagedTaskException(_logger, 
-										"Failed to remove the task from the scheduled tasks list.");
+								_exitException = new ManagedTaskException(_logger, "Failed to remove the task from the scheduled tasks list.");
 								SetException(_exitException);
 								return;
 							}
@@ -380,21 +391,20 @@ namespace Dexih.Utils.ManagedTasks
 						ReStartTask(managedTask);
 					}
 				}
-
-				Debug.WriteLine("The processing is complete.");
-
-			}
-			catch (Exception ex)
-			{
-				if (!(ex is ManagedTaskException))
+				catch (Exception ex)
 				{
-					_logger?.LogCritical(ex, "Error processing status change: " + ex.Message);
+					if (!(ex is ManagedTaskException))
+					{
+						_logger?.LogCritical(ex, $"Error processing status change for task {statusChange.managedTask?.Name}." + ex.Message);
+					}
+
+					_exitException = ex;
+					// _statusChangeQueue.CompleteAdding();
+					SetException(_exitException);
 				}
-				_exitException = ex;
-				_statusChangeQueue.CompleteAdding();
-				SetException(_exitException);
 			}
 
+			_logger?.LogInformation("The managed task status processing has completed.");
 		}
 
 		private void Schedule(string reference)
@@ -576,7 +586,14 @@ namespace Dexih.Utils.ManagedTasks
 				        return;
 			        }
 
-			        managedTask.Dispose();
+			        try
+			        {
+				        managedTask.Dispose();
+			        }
+			        catch (Exception ex)
+			        {
+				        managedTask.Error("Failed to dispose task.", ex);
+			        }
 
 			        if (!_activeTasks.TryRemove(managedTask.TaskId, out var activeTask))
 			        {
@@ -633,9 +650,20 @@ namespace Dexih.Utils.ManagedTasks
 		        {
 			        _logger?.LogCritical(ex, "Error restarting task: " + ex.Message);
 		        }
+
+		        managedTask.Error("Error in restart task.", ex);
+
+		        try
+		        {
+			        managedTask.Dispose();
+		        }
+		        catch (Exception ex2)
+		        {
+			        managedTask.Error("Failed to dispose task.", ex2);
+		        }
 		        
 		        _activeTasks.TryRemove(managedTask.TaskId, out var _);
-		        managedTask.Dispose();
+
 		        throw;
 	        }
         }

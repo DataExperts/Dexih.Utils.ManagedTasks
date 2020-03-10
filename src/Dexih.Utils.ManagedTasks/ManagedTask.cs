@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Dexih.Utils.ManagedTasks
 {
@@ -23,6 +24,11 @@ namespace Dexih.Utils.ManagedTasks
         public event TaskDelegate OnSchedule;
         public event TaskDelegate OnFileWatch;
 
+        [JsonIgnore]
+        [IgnoreDataMember]
+        public ILogger Logger { get; set; }
+
+        
         /// <summary>
         /// Used to store changes
         /// </summary>
@@ -182,7 +188,6 @@ namespace Dexih.Utils.ManagedTasks
         private readonly CancellationTokenSource _cancellationTokenSource;
 
         private readonly ManagedTaskProgress _progress;
-        private Task _progressInvoke;
         private bool _previousTrigger;
        
         private Timer _timer;
@@ -201,44 +206,72 @@ namespace Dexih.Utils.ManagedTasks
             _cancellationTokenSource = new CancellationTokenSource();
             ResetChangeId();
 
+            Task _progressInvoke = null;
+
             // progress routine which calls the progress event async 
             _progress = new ManagedTaskProgress(value =>
             {
-                if ( Percentage != value.Percentage || StepName != value.StepName || Counter != value.Counter)
+                // if progress hasn't changed, then ignore.
+                if (Percentage == value.Percentage && StepName == value.StepName && Counter == value.Counter)
                 {
-                    Percentage = value.Percentage;
-                    StepName = value.StepName;
-                    Counter = value.Counter;
+                    return;
+                }
+
+                Percentage = value.Percentage;
+                StepName = value.StepName;
+                Counter = value.Counter;
                     
-                    // if the previous progress has finished?
-                    if (_progressInvoke == null || _progressInvoke.IsCompleted)
+                // if the previous progress has finished?
+                if ((_progressInvoke == null || _progressInvoke.IsCompleted))
+                {
+                    _progressInvoke = Task.Run(() =>
                     {
-                        _progressInvoke = Task.Run(() =>
+                        // keep creating a new progress event until the flag is not set.
+                        // this allows code to keep running whilst a progress event runs in the background.
+                        // if also ensures progress events are only sent one at a time.
+                        do
                         {
-                            // keep creating a new progress event until the flag is not set.
-                            // this allows code to keep running whilst a progress event runs in the background.
-                            // if also ensures progress events are only sent one at a time.
-                            do
+                            anotherProgressInvoke = false;
+                            try
                             {
-                                anotherProgressInvoke = false;
                                 OnProgress?.Invoke(this, value);
-                            } while (anotherProgressInvoke);
-                        });
-                    }
-                    else
-                    {
-                        anotherProgressInvoke = true;
-                    }
+                            }
+                            catch (Exception ex)
+                            {
+                                SetException($"The task {Name} with id {ReferenceId} failed when updating progress", ex);
+                                break;
+                            }
+                                
+                        } while (anotherProgressInvoke);
+                    });
+                }
+                else
+                {
+                    anotherProgressInvoke = true;
                 }
             });
         }
 
         private void SetStatus(EManagedTaskStatus newStatus)
         {
-            if (newStatus != Status)
+            if (newStatus != Status || Status == EManagedTaskStatus.Error)
             {
                 OnStatus?.Invoke(this, newStatus);
             }
+        }
+
+        private void SetException(string message, Exception ex)
+        {
+            if (Exception != null)
+            {
+                Exception = new AggregateException(message, ex, Exception);
+            }
+            else
+            {
+                Exception = new ManagedTaskException(message, ex);
+            }
+
+            Logger?.LogError(message, Exception);
         }
         
         /// <summary>
@@ -421,6 +454,13 @@ namespace Dexih.Utils.ManagedTasks
                 _startTask = ManagedObject.StartAsync(_progress, _cancellationTokenSource.Token)
                     .ContinueWith(o =>
                     {
+                        if (Status == EManagedTaskStatus.Cancelled || Status == EManagedTaskStatus.Completed ||
+                            Status == EManagedTaskStatus.Error)
+                        {
+                            EndTime = DateTime.Now;
+                            return;
+                        }
+
                         switch (o.Status)
                         {
                             case TaskStatus.RanToCompletion:
@@ -437,7 +477,7 @@ namespace Dexih.Utils.ManagedTasks
                                 break;
                             case TaskStatus.Faulted:
                                 Message = o.Exception?.Message ?? "Unknown error occurred";
-                                Exception = o.Exception;
+                                SetException(Message, o.Exception);
                                 Success = false;
                                 EndTime = DateTime.Now;
                                 Percentage = 100;
@@ -445,7 +485,7 @@ namespace Dexih.Utils.ManagedTasks
                                 break;
                             default:
                                 Message = "Task failed with status " + o.Status + ".  Message:" + (o.Exception?.Message??"No Message");
-                                Exception = o.Exception;
+                                SetException(Message, o.Exception);
                                 Success = false;
                                 EndTime = DateTime.Now;
                                 SetStatus(EManagedTaskStatus.Error);
@@ -459,7 +499,7 @@ namespace Dexih.Utils.ManagedTasks
             {
                 EndTime = DateTime.Now;
                 Message = ex.Message;
-                Exception = ex;
+                SetException(ex.Message, ex);
                 Success = false;
                 Percentage = 100;
                 SetStatus(EManagedTaskStatus.Error);
@@ -507,7 +547,7 @@ namespace Dexih.Utils.ManagedTasks
         {
             Success = false;
             Message = message;
-            Exception = ex;
+            SetException(message, ex);
             SetStatus(EManagedTaskStatus.Error);
         }
 
