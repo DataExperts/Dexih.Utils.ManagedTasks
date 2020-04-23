@@ -206,7 +206,7 @@ namespace Dexih.Utils.ManagedTasks
             _cancellationTokenSource = new CancellationTokenSource();
             ResetChangeId();
 
-            Task _progressInvoke = null;
+            Task progressInvoke = null;
 
             // progress routine which calls the progress event async 
             _progress = new ManagedTaskProgress(value =>
@@ -222,9 +222,9 @@ namespace Dexih.Utils.ManagedTasks
                 Counter = value.Counter;
                     
                 // if the previous progress has finished?
-                if ((_progressInvoke == null || _progressInvoke.IsCompleted))
+                if ((progressInvoke == null || progressInvoke.IsCompleted))
                 {
-                    _progressInvoke = Task.Run(() =>
+                    progressInvoke = Task.Run(() =>
                     {
                         // keep creating a new progress event until the flag is not set.
                         // this allows code to keep running whilst a progress event runs in the background.

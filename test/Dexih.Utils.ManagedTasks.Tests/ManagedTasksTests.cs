@@ -105,7 +105,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         }
 
         [Fact]
-        public async Task Test_ManagedTask_BadTrigger()
+        public void Test_ManagedTask_BadTrigger()
         {
             var managedTasks = new ManagedTasks.ManagedTasks();
             
@@ -537,7 +537,8 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
             Assert.Equal(5, scheduleCount);
 
-            Assert.Equal(5, managedTasks.ScheduledCount);
+            Assert.Equal(0, managedTasks.RunningCount);
+            Assert.Equal(0, managedTasks.ScheduledCount);
             Assert.Equal(5, managedTasks.CompletedCount);
 
             // 10 seconds = Initial 1 + 2 *(5-1) recurs + 1 final job

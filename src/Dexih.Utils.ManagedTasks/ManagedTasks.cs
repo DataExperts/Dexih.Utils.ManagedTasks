@@ -2,8 +2,6 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -40,16 +38,16 @@ namespace Dexih.Utils.ManagedTasks
         public long CreatedCount => _createdCount;
 		
         [DataMember(Order = 2)]
-        public long ScheduledCount => _scheduledCount;
+        public long ScheduledCount => _scheduledTasks.Count;
 		
         [DataMember(Order = 3)]
         public long FileWatchCount => _fileWatchCount;
         
         [DataMember(Order = 4)]
-        public long QueuedCount => _queuedCount;
+        public long QueuedCount => _queuedTasks.Count;
         
         [DataMember(Order = 5)]
-        public long RunningCount => _runningCount;
+        public long RunningCount => _runningTasks.Count;
         
         [DataMember(Order = 6)]
         public long CompletedCount => _completedCount;
@@ -339,12 +337,15 @@ namespace Dexih.Utils.ManagedTasks
 							Interlocked.Increment(ref _runningCount);
 							break;
 						case EManagedTaskStatus.Completed:
+							Interlocked.Decrement(ref _runningCount);
 							Interlocked.Increment(ref _completedCount);
 							break;
 						case EManagedTaskStatus.Error:
+							Interlocked.Decrement(ref _runningCount);
 							Interlocked.Increment(ref _errorCount);
 							break;
 						case EManagedTaskStatus.Cancelled:
+							Interlocked.Decrement(ref _runningCount);
 							Interlocked.Increment(ref _cancelCount);
 							break;
 					}
