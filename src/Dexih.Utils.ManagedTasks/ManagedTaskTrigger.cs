@@ -416,7 +416,7 @@ namespace Dexih.Utils.ManagedTasks
                 if (passDate)
                 {
                     recurs++;
-                    if (MaxRecurs != null && recurs > MaxRecurs.Value)
+                    if ((MaxRecurs != null && MaxRecurs > 0) && recurs > MaxRecurs.Value)
                     {
                         // The trigger has exceeded the maximum recurrences
                         return null;
