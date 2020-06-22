@@ -356,10 +356,7 @@ namespace Dexih.Utils.ManagedTasks
             //set the initial start date
             var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
 
-            if (DaysOfWeek != null && DaysOfWeek.Length == 0)
-            {
-                throw new ManagedTaskTriggerException(this, "No days of the week have been selected.");
-            }
+            IsValidTrigger();
 
             if (dailyStart > dailyEnd)
             {
@@ -393,8 +390,11 @@ namespace Dexih.Utils.ManagedTasks
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
             {
-                startAt = startAt.Add(IntervalTime.Value);
-                
+                if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
+                {
+                    startAt = startAt.Add(IntervalTime.Value);
+                }
+
                 if (startAt > EndDate + dailyEnd)
                 {
                     return null;
@@ -403,7 +403,7 @@ namespace Dexih.Utils.ManagedTasks
                 passDate = true;
 
                 //if this is an invalid day, move to next day/starttime.
-                if (DaysOfWeek?.Contains(DayOfWeek(startAt)) == false)
+                if (IsValidDate(startAt) == false)
                 {
                     passDate = false;
                 }
@@ -413,10 +413,10 @@ namespace Dexih.Utils.ManagedTasks
                     passDate = false;
                 }
 
-                if (passDate)
+                if (passDate && (MaxRecurs != null && MaxRecurs > 0))
                 {
                     recurs++;
-                    if ((MaxRecurs != null && MaxRecurs > 0) && recurs > MaxRecurs.Value)
+                    if (recurs > MaxRecurs.Value)
                     {
                         // The trigger has exceeded the maximum recurrences
                         return null;
@@ -425,19 +425,16 @@ namespace Dexih.Utils.ManagedTasks
                 else
                 {
                     //if the day of the week is invalid, move the the start of the next valid one.
-                    if (DaysOfWeek == null)
+                    for (var i = 0; i < 31; i++)
                     {
                         startAt = startAt.AddDays(1);
-                    }
-                    else
-                    {
-                        for (var i = 0; i < 6; i++)
+
+                        if (IsValidDate(startAt))
                         {
-                            startAt = startAt.AddDays(1);
-                            if (DaysOfWeek.Contains(DayOfWeek(startAt)))
-                                break;
+                            break;
                         }
                     }
+
                     startAt = startAt.Date.Add(dailyStart);
                 }
 
@@ -450,6 +447,73 @@ namespace Dexih.Utils.ManagedTasks
             return startAt;
         }
 
+        private bool IsValidTrigger()
+        {
+            if (DaysOfWeek != null && DaysOfWeek.Length == 0)
+            {
+                throw new ManagedTaskTriggerException(this, "No days of the week have been selected.");
+            }
+            if (DaysOfMonth != null && DaysOfMonth.Length == 0)
+            {
+                throw new ManagedTaskTriggerException(this, "No days of the month have been selected.");
+            }
+            if (WeeksOfMonth != null && WeeksOfMonth.Length == 0)
+            {
+                throw new ManagedTaskTriggerException(this, "No weeks of the month have been selected.");
+            }
+
+            return true;
+        }
+
+        private bool CheckDaysOfWeek(DateTime date)
+        {
+            return DaysOfWeek == null || DaysOfWeek.Contains(DayOfWeek(date));
+        }
+
+        private bool CheckDaysOfMonth(DateTime date)
+        {
+            return DaysOfMonth == null || DaysOfMonth.Contains(date.Day);
+        }
+
+        private bool CheckWeekOfMonth(DateTime date)
+        {
+            if (WeeksOfMonth == null)
+            {
+                return true;
+                
+            }
+            
+            var validWeekOfMonth = false;
+            var dayOfMonth = date.Day;
+            foreach(var weekOfMonth in WeeksOfMonth)
+            {
+                switch(weekOfMonth)
+                {
+                    case EWeekOfMonth.First:
+                        validWeekOfMonth = dayOfMonth <= 7;
+                        break;
+                    case EWeekOfMonth.Second:
+                        validWeekOfMonth = dayOfMonth > 7 && dayOfMonth <= 14;
+                        break;
+                    case EWeekOfMonth.Third:
+                        validWeekOfMonth = dayOfMonth > 14 && dayOfMonth <= 21;
+                        break;
+                    case EWeekOfMonth.Fourth:
+                        validWeekOfMonth = dayOfMonth > 22 && dayOfMonth <= 29;
+                        break;
+                    case EWeekOfMonth.Last:
+                        validWeekOfMonth = dayOfMonth > DateTime.DaysInMonth(date.Year, date.Month) -7;
+                        break;
+                }
+                if(validWeekOfMonth)
+                {
+                    break;
+                }
+            }
+
+            return validWeekOfMonth;
+        }
+        
         /// <summary>
         /// Confirms if the day is a valid date
         /// </summary>
@@ -466,56 +530,11 @@ namespace Dexih.Utils.ManagedTasks
                 return true;
             }
 
-            if(DaysOfWeek != null)
-            {
-                if (!DaysOfWeek.Contains(DayOfWeek(checkDate)))
-                {
-                    return false;
-                }
-            }
+            var checkDates = CheckDaysOfMonth(checkDate) && CheckDaysOfWeek(checkDate) && CheckWeekOfMonth(checkDate);
 
-            if(DaysOfMonth != null)
+            if (!checkDates)
             {
-                if(!DaysOfMonth.Contains(checkDate.Day))
-                {
-                    return false;
-                }
-            }
-
-            if(WeeksOfMonth != null)
-            {
-                var validWeekOfMonth = false;
-                var dayOfMonth = checkDate.Day;
-                foreach(var weekOfMonth in WeeksOfMonth)
-                {
-                    switch(weekOfMonth)
-                    {
-                        case EWeekOfMonth.First:
-                            validWeekOfMonth = dayOfMonth <= 7;
-                            break;
-                        case EWeekOfMonth.Second:
-                            validWeekOfMonth = dayOfMonth > 7 && dayOfMonth <= 14;
-                            break;
-                        case EWeekOfMonth.Third:
-                            validWeekOfMonth = dayOfMonth > 14 && dayOfMonth <= 21;
-                            break;
-                        case EWeekOfMonth.Fourth:
-                            validWeekOfMonth = dayOfMonth > 22 && dayOfMonth <= 29;
-                            break;
-                        case EWeekOfMonth.Last:
-                            validWeekOfMonth = dayOfMonth > DateTime.DaysInMonth(checkDate.Year, checkDate.Month) -7;
-                            break;
-                    }
-                    if(validWeekOfMonth)
-                    {
-                        break;
-                    }
-                }
-
-                if(!validWeekOfMonth)
-                {
-                    return false;
-                }
+                return false;
             }
 
             if(SkipDates != null)

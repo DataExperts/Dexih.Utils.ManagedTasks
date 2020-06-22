@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection.Metadata;
 using Dexih.Utils.ManagedTasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -85,6 +86,136 @@ namespace Dexih.Utils.Managed.Tasks.Tests
 
         }
         
+        [Fact]
+        public void ScheduleOnceDaily()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var startDate = DateTime.Now;
+            var schedule = new ManagedTaskTrigger()
+            {
+                IntervalType = EIntervalType.Interval,
+                StartDate = startDate.AddHours(-24),
+                StartTime = new TimeSpan(1,0,0),
+                MaxRecurs = 0,
+                DaysOfWeek = new[]
+                {
+                    EDayOfWeek.Friday, EDayOfWeek.Monday, EDayOfWeek.Saturday, EDayOfWeek.Sunday, EDayOfWeek.Thursday,
+                    EDayOfWeek.Tuesday, EDayOfWeek.Wednesday
+                }
+            };
+
+            var scheduled = schedule.NextOccurrence(startDate);
+            
+            // add 25 hours to the base date which will give expected date next day at 1am.
+            var expected = startDate.Date.AddHours(25).ToUniversalTime();
+            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+        }
+        
+        [Fact]
+        public void ScheduleOnDayOfWeek()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var startDate = DateTime.Now;
+
+            var expectedDate = startDate;
+            // get the next friday date
+            while (expectedDate.DayOfWeek != DayOfWeek.Friday)
+            {
+                expectedDate = expectedDate.AddDays(1);
+            }
+            
+            // this date is a monday
+            
+            var schedule = new ManagedTaskTrigger()
+            {
+                IntervalType = EIntervalType.Interval,
+                StartDate = startDate,
+                StartTime = new TimeSpan(1,0,0),
+                MaxRecurs = 0,
+                DaysOfWeek = new[]
+                {
+                    EDayOfWeek.Friday
+                }
+            };
+
+            var scheduled = schedule.NextOccurrence(startDate);
+            
+            // the expected date will be on the following friday
+            var expected = expectedDate.Date.AddHours(1).ToUniversalTime();
+            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+        }
+        
+        [Fact]
+        public void ScheduleOnDayOfMonth()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var startDate = DateTime.Now;
+
+            var expectedDate = startDate;
+            // get the next 10th of month date
+            while (expectedDate.Day != 10)
+            {
+                expectedDate = expectedDate.AddDays(1);
+            }
+            
+            // this date is a monday
+            
+            var schedule = new ManagedTaskTrigger()
+            {
+                IntervalType = EIntervalType.Interval,
+                StartDate = startDate,
+                StartTime = new TimeSpan(1,0,0),
+                MaxRecurs = 0,
+                DaysOfMonth = new[]
+                {
+                    10
+                }
+            };
+
+            var scheduled = schedule.NextOccurrence(startDate);
+            
+            // the expected date will be on the following friday
+            var expected = expectedDate.Date.AddHours(1).ToUniversalTime();
+            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+        }
+        
+        [Fact]
+        public void ScheduleOnDayWeekAndDayOfMonth()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var startDate = DateTime.Now;
+
+            var expectedDate = startDate;
+            // get the next 10th of month date, that is a friday
+            while (expectedDate.Day != 10 || expectedDate.DayOfWeek != DayOfWeek.Friday)
+            {
+                expectedDate = expectedDate.AddDays(1);
+            }
+            
+            // this date is a monday
+            
+            var schedule = new ManagedTaskTrigger()
+            {
+                IntervalType = EIntervalType.Interval,
+                StartDate = startDate,
+                StartTime = new TimeSpan(1,0,0),
+                MaxRecurs = 0,
+                DaysOfMonth = new[]
+                {
+                    10
+                },
+                DaysOfWeek= new[]
+                {
+                    EDayOfWeek.Friday
+                }
+            };
+
+            var scheduled = schedule.NextOccurrence(startDate);
+            
+            // the expected date will be on the following friday
+            var expected = expectedDate.Date.AddHours(1).ToUniversalTime();
+            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+        }
         
 //TODO more schedule tests
 
