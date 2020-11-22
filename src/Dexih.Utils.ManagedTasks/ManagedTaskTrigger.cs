@@ -413,10 +413,11 @@ namespace Dexih.Utils.ManagedTasks
                     passDate = false;
                 }
 
-                if (passDate && (MaxRecurs != null && MaxRecurs > 0))
+                // if MaxRecurs == null, assume this is unlimited.
+                if (passDate && (MaxRecurs == null || MaxRecurs > 0))
                 {
                     recurs++;
-                    if (recurs > MaxRecurs.Value)
+                    if (recurs > MaxRecurs)
                     {
                         // The trigger has exceeded the maximum recurrences
                         return null;

@@ -112,6 +112,34 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         }
         
         [Fact]
+        public void ScheduleWithInterval()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var startDate = DateTime.Now;
+            var schedule = new ManagedTaskTrigger()
+            {
+                Details =  "",
+                EndDate = null,
+                EndTime = null,
+                IntervalTime =  TimeSpan.FromHours(4),
+                DaysOfWeek = null,
+                IntervalType = EIntervalType.Interval,
+                MaxRecurs =  null,
+                SkipDates = null,
+                StartDate = null,
+                StartTime = startDate.TimeOfDay,
+                DaysOfMonth = null,
+                WeeksOfMonth = null
+            };
+
+            var scheduled = schedule.NextOccurrence(startDate.AddSeconds(1));
+            
+            // add 4 hours to the base date which will give expected date.
+            var expected = startDate.AddHours(4).ToUniversalTime();
+            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+        }
+        
+        [Fact]
         public void ScheduleOnDayOfWeek()
         {
             //the schedule once, should be return the same date if in the future.
