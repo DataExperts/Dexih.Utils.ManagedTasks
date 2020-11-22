@@ -13,8 +13,6 @@ namespace Dexih.Utils.ManagedTasks
     [DataContract]
     public class ManagedTaskTrigger
     {
-       
-
         public ManagedTaskTrigger() { }
 
         /// <summary>
@@ -208,25 +206,15 @@ namespace Dexih.Utils.ManagedTasks
         /// <returns>DateTime of schedule, or null if no date is available</returns>
         public DateTime? NextOccurrence(DateTime fromDate)
         {
-            DateTime? nextDate = null;
-            switch(IntervalType)
+            DateTime? nextDate = IntervalType switch
             {
-                case EIntervalType.None:
-                    nextDate = null;
-                    break;
-                case EIntervalType.Daily:
-                    nextDate = NextOccurrenceDaily(fromDate);
-                    break;
-                case EIntervalType.Interval:
-                    nextDate = NextOccurrenceInterval(fromDate);
-                    break;
-                case EIntervalType.Monthly:
-                    nextDate = NextOccurrenceMonthly(fromDate);
-                    break;
-                case EIntervalType.Once:
-                    nextDate = NextOccurrenceOnce(fromDate);
-                    break;
-            }
+                EIntervalType.None => null,
+                EIntervalType.Daily => NextOccurrenceDaily(fromDate),
+                EIntervalType.Interval => NextOccurrenceInterval(fromDate),
+                EIntervalType.Monthly => NextOccurrenceMonthly(fromDate),
+                EIntervalType.Once => NextOccurrenceOnce(fromDate),
+                _ => null
+            };
 
             if(nextDate != null && nextDate > EndDate)
             {
@@ -356,7 +344,7 @@ namespace Dexih.Utils.ManagedTasks
             //set the initial start date
             var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
 
-            IsValidTrigger();
+            ValidateTrigger();
 
             if (dailyStart > dailyEnd)
             {
@@ -399,8 +387,6 @@ namespace Dexih.Utils.ManagedTasks
                 {
                     return null;
                 }
-
-                passDate = true;
 
                 //if this is an invalid day, move to next day/starttime.
                 if (IsValidDate(startAt) == false)
@@ -448,7 +434,7 @@ namespace Dexih.Utils.ManagedTasks
             return startAt;
         }
 
-        private bool IsValidTrigger()
+        private void ValidateTrigger()
         {
             if (DaysOfWeek != null && DaysOfWeek.Length == 0)
             {
@@ -462,8 +448,6 @@ namespace Dexih.Utils.ManagedTasks
             {
                 throw new ManagedTaskTriggerException(this, "No weeks of the month have been selected.");
             }
-
-            return true;
         }
 
         private bool CheckDaysOfWeek(DateTime date)

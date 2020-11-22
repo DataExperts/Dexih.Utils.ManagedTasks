@@ -132,10 +132,13 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 WeeksOfMonth = null
             };
 
-            var scheduled = schedule.NextOccurrence(startDate.AddMinutes(1));
+            var shiftTime = startDate.AddSeconds(1);
+            var scheduled = schedule.NextOccurrence(shiftTime);
             
             // add 4 hours to the base date which will give expected date.
             var expected = startDate.AddHours(4);
+            
+            _output.WriteLine($"Start Date: {startDate}, Shift Time: {shiftTime}, Scheduled: {scheduled}, Expected: {expected}");
             Assert.Equal(expected, scheduled.Value);
         }
         
