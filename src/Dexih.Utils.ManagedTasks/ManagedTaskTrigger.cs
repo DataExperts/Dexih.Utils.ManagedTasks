@@ -382,6 +382,7 @@ namespace Dexih.Utils.ManagedTasks
                 if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
                 {
                     startAt = startAt.Add(IntervalTime.Value);
+                    Console.WriteLine($"2 . startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
                 }
 
                 if (startAt > EndDate + dailyEnd)
