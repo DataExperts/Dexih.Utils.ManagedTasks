@@ -135,8 +135,8 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var scheduled = schedule.NextOccurrence(startDate.AddSeconds(1));
             
             // add 4 hours to the base date which will give expected date.
-            var expected = startDate.AddHours(4).ToUniversalTime();
-            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+            var expected = startDate.AddHours(4);
+            Assert.Equal(expected, scheduled.Value);
         }
         
         [Fact]
