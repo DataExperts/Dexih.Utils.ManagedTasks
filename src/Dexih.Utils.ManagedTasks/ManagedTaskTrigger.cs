@@ -377,6 +377,8 @@ namespace Dexih.Utils.ManagedTasks
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
             {
+                Console.WriteLine($"startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
+
                 if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
                 {
                     startAt = startAt.Add(IntervalTime.Value);
