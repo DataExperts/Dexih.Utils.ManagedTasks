@@ -374,9 +374,9 @@ namespace Dexih.Utils.ManagedTasks
             {
                 startAt = startAt.AddDays(1);
 
-                // scan for 730 intervals before giving up on finding a valid date.
+                // scan for 100 years of intervals before giving up on finding a valid date.
                 validDateCounter++;
-                if (validDateCounter > 730)
+                if (validDateCounter > 36500)
                 {
                     return null;
                 }

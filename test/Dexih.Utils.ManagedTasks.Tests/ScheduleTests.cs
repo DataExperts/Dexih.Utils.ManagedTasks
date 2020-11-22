@@ -115,7 +115,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         public void ScheduleWithInterval()
         {
             //the schedule once, should be return the same date if in the future.
-            var startDate = DateTime.Now;
+            var startDate = DateTime.Parse("2020-11-24T22:44:25.2222265+00:00");
             var schedule = new ManagedTaskTrigger()
             {
                 Details =  "",
@@ -132,7 +132,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 WeeksOfMonth = null
             };
 
-            var scheduled = schedule.NextOccurrence(startDate.AddSeconds(1));
+            var scheduled = schedule.NextOccurrence(startDate.AddMinutes(1));
             
             // add 4 hours to the base date which will give expected date.
             var expected = startDate.AddHours(4);
