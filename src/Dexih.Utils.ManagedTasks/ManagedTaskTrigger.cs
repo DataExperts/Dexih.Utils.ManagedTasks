@@ -433,6 +433,8 @@ namespace Dexih.Utils.ManagedTasks
                 }
 
             }
+            
+            Console.WriteLine($"2 . startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
             return startAt;
         }
 
