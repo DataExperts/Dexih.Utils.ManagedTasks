@@ -216,11 +216,7 @@ namespace Dexih.Utils.ManagedTasks
                 _ => null
             };
 
-            if(nextDate != null && nextDate > EndDate)
-            {
-                return null;
-            }
-            return nextDate;
+            return nextDate > EndDate ? null : nextDate;
         }
 
         private DateTime? NextOccurrenceOnce(DateTime fromDate)
@@ -344,6 +340,7 @@ namespace Dexih.Utils.ManagedTasks
             //set the initial start date
             var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
 
+            Console.WriteLine($"startAt: {startAt}");
             ValidateTrigger();
 
             if (dailyStart > dailyEnd)
@@ -374,6 +371,8 @@ namespace Dexih.Utils.ManagedTasks
             startAt = startAt.Add(dailyStart);
             var passDate = true;
             var recurs = 1;
+
+            Console.WriteLine($"startAt: {startAt}, fromDate: {fromDate}");
 
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
