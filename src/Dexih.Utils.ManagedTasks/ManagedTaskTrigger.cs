@@ -396,9 +396,10 @@ namespace Dexih.Utils.ManagedTasks
                     passDate = false;
                 }
 
+                Console.WriteLine($"Daily Start/End:::::.startAt.TimeOfDay: {startAt.TimeOfDay} dailyStart: {dailyStart}, dailyEnd: {dailyEnd}, less than daily start: {startAt.TimeOfDay < dailyStart}, greater than daily end: {startAt.TimeOfDay > dailyEnd}");
+
                 if (startAt.TimeOfDay < dailyStart || startAt.TimeOfDay > dailyEnd)
                 {
-                    Console.WriteLine($"2.startAt.TimeOfDay: {startAt.TimeOfDay} dailyStart: {dailyStart}, dailyEnd: {dailyEnd}");
                     passDate = false;
                 }
 
