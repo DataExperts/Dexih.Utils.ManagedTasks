@@ -372,6 +372,7 @@ namespace Dexih.Utils.ManagedTasks
             var recurs = 1;
 
             //loop through the intervals until we find one that is greater than the current time.
+            Console.WriteLine($"startAt: {startAt}, fromDate: {fromDate}, startAt < fromDate: {startAt < fromDate}");
             while (startAt < fromDate && passDate)
             {
                 if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
@@ -392,7 +393,6 @@ namespace Dexih.Utils.ManagedTasks
 
                 if (startAt.TimeOfDay > dailyEnd)
                 {
-                    Console.WriteLine($"StartAt: {startAt.TimeOfDay}, dailyEnd: {dailyEnd}, startAt.TimeOfDay > dailyEnd: {startAt.TimeOfDay > dailyEnd}");
                     passDate = false;
                 }
 
