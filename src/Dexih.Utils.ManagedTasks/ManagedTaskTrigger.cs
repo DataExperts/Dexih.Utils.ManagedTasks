@@ -340,7 +340,6 @@ namespace Dexih.Utils.ManagedTasks
             //set the initial start date
             var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
 
-            Console.WriteLine($"startAt: {startAt}");
             ValidateTrigger();
 
             if (dailyStart > dailyEnd)
@@ -372,17 +371,12 @@ namespace Dexih.Utils.ManagedTasks
             var passDate = true;
             var recurs = 1;
 
-            Console.WriteLine($"startAt: {startAt}, fromDate: {fromDate}");
-
             //loop through the intervals until we find one that is greater than the current time.
             while (startAt < fromDate && passDate)
             {
-                Console.WriteLine($"startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
-
                 if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
                 {
                     startAt = startAt.Add(IntervalTime.Value);
-                    Console.WriteLine($"2 . startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
                 }
 
                 if (startAt > EndDate + dailyEnd)
@@ -396,9 +390,7 @@ namespace Dexih.Utils.ManagedTasks
                     passDate = false;
                 }
 
-                Console.WriteLine($"Daily Start/End:::::.startAt.TimeOfDay: {startAt.TimeOfDay} dailyStart: {dailyStart}, dailyEnd: {dailyEnd}, less than daily start: {startAt.TimeOfDay < dailyStart}, greater than daily end: {startAt.TimeOfDay > dailyEnd}");
-
-                if (startAt.TimeOfDay < dailyStart || startAt.TimeOfDay > dailyEnd)
+                if (startAt.TimeOfDay > dailyEnd)
                 {
                     passDate = false;
                 }
@@ -436,7 +428,6 @@ namespace Dexih.Utils.ManagedTasks
 
             }
             
-            Console.WriteLine($"2 . startAt: {startAt}, fromDate: {fromDate}, IntervalTime: {IntervalTime}");
             return startAt;
         }
 
