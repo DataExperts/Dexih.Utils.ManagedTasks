@@ -204,7 +204,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Retrieves the next time this schedule will occur from the specified date.
         /// </summary>
         /// <returns>DateTime of schedule, or null if no date is available</returns>
-        public DateTime? NextOccurrence(DateTime fromDate)
+        public DateTime? NextOccurrence(DateTimeOffset fromDate)
         {
             DateTime? nextDate = IntervalType switch
             {
@@ -219,7 +219,7 @@ namespace Dexih.Utils.ManagedTasks
             return nextDate > EndDate ? null : nextDate;
         }
 
-        private DateTime? NextOccurrenceOnce(DateTime fromDate)
+        private DateTime? NextOccurrenceOnce(DateTimeOffset fromDate)
         {
             // for once of, return the start date if it in the future
             if (StartDate == null)
@@ -238,7 +238,7 @@ namespace Dexih.Utils.ManagedTasks
             return null;
         }
 
-        private DateTime? NextOccurrenceMonthly(DateTime fromDate)
+        private DateTime? NextOccurrenceMonthly(DateTimeOffset fromDate)
         {
             // check if a valid day has already occurred, this means we should jump to next month
             var priorDate = new DateTime(fromDate.Year, fromDate.Month, 1);
@@ -260,7 +260,7 @@ namespace Dexih.Utils.ManagedTasks
             if (priorValidDate)
             {
                 nextDate = nextDate.AddMonths(1);
-                nextDate = new DateTime(nextDate.Year, nextDate.Month, 1);
+                nextDate = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, 1), fromDate.Offset);
             }
 
             // if the start time has passed, move to the next day.
@@ -286,17 +286,17 @@ namespace Dexih.Utils.ManagedTasks
 
             if (isValidDate)
             {
-                var startDateTime = new DateTime(nextDate.Year, nextDate.Month, nextDate.Day);
+                var startDateTime = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, nextDate.Day), fromDate.Offset);
                 if (StartTime != null)
                 {
                     startDateTime = startDateTime.Add(StartTime.Value);
                 }
-                return startDateTime;
+                return startDateTime.DateTime;
             }
             return null;
         }
 
-        private DateTime? NextOccurrenceDaily(DateTime fromDate)
+        private DateTime? NextOccurrenceDaily(DateTimeOffset fromDate)
         {
             var nextDate = fromDate;
 
@@ -322,23 +322,25 @@ namespace Dexih.Utils.ManagedTasks
 
             if (isValidDate)
             {
-                var startDateTime = new DateTime(nextDate.Year, nextDate.Month, nextDate.Day);
+                var startDateTime = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, nextDate.Day), fromDate.Offset);
                 if (StartTime != null)
                 {
                     startDateTime = startDateTime.Add(StartTime.Value);
                 }
-                return startDateTime;
+                return startDateTime.DateTime;
             }
             return null;
         }
 
-        private DateTime? NextOccurrenceInterval(DateTime fromDate)
+        private DateTime? NextOccurrenceInterval(DateTimeOffset fromDate)
         {
+            var offSet = fromDate.Offset;
+            
             var dailyStart = StartTime ?? new TimeSpan(0, 0, 0);
             var dailyEnd = EndTime ?? new TimeSpan(23, 59, 59);
-
+            
             //set the initial start date
-            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : StartDate.Value.Date;
+            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : new DateTimeOffset(StartDate.Value.Date, offSet);
 
             ValidateTrigger();
 
@@ -428,7 +430,7 @@ namespace Dexih.Utils.ManagedTasks
 
             }
             
-            return startAt;
+            return startAt.DateTime;
         }
 
         private void ValidateTrigger()
@@ -447,17 +449,17 @@ namespace Dexih.Utils.ManagedTasks
             }
         }
 
-        private bool CheckDaysOfWeek(DateTime date)
+        private bool CheckDaysOfWeek(DateTimeOffset date)
         {
             return DaysOfWeek == null || DaysOfWeek.Contains(DayOfWeek(date));
         }
 
-        private bool CheckDaysOfMonth(DateTime date)
+        private bool CheckDaysOfMonth(DateTimeOffset date)
         {
             return DaysOfMonth == null || DaysOfMonth.Contains(date.Day);
         }
 
-        private bool CheckWeekOfMonth(DateTime date)
+        private bool CheckWeekOfMonth(DateTimeOffset date)
         {
             if (WeeksOfMonth == null)
             {
@@ -500,7 +502,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Confirms if the day is a valid date
         /// </summary>
         /// <param name="checkDate"></param>
-        public bool IsValidDate(DateTime checkDate)
+        public bool IsValidDate(DateTimeOffset checkDate)
         {
             if (IntervalType == EIntervalType.None)
             {
@@ -530,7 +532,7 @@ namespace Dexih.Utils.ManagedTasks
             return true;
         }
 
-        private EDayOfWeek DayOfWeek(DateTime date)
+        private EDayOfWeek DayOfWeek(DateTimeOffset date)
         {
             return (EDayOfWeek)Enum.Parse(typeof(EDayOfWeek), date.DayOfWeek.ToString());
         }
