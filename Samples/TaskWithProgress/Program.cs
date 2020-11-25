@@ -119,7 +119,7 @@ namespace TaskWithProgress
             // dispose actions
         }
 
-        public override void Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
+        public override void Schedule(DateTimeOffset startsAt, CancellationToken cancellationToken = default)
         {
             // schedule actions
         }

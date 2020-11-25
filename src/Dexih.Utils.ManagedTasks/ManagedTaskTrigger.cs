@@ -108,9 +108,79 @@ namespace Dexih.Utils.ManagedTasks
         /// </summary>
         [DataMember(Order = 11)]
         public int? MaxRecurs { get; set; } = 1;
-
-
+        
+        /// <summary>
+        /// The time zone reference for the start and end times
+        /// </summary>
+        [DataMember(Order = 12)]
+        public string TimeZone { get; set; }
+        
         private string _details;
+
+        // private TimeSpan GetTimeOffset()
+        // {
+        //     if (string.IsNullOrWhiteSpace(TimeZone))
+        //     {
+        //         return TimeSpan.Zero;
+        //     }
+        //
+        //     var timeZone = TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+        //
+        //     if (timeZone != null)
+        //     {
+        //         return timeZone.BaseUtcOffset;
+        //     }
+        //     
+        //     return TimeSpan.Zero;
+        // }
+        //
+        // private DateTimeOffset ConvertDate(DateTime inputTime, TimeSpan fromOffset)
+        // {
+        //     return (new DateTimeOffset(inputTime)).ToOffset(fromOffset);
+        // }
+
+        private TimeZoneInfo GetTimeZoneInfo()
+        {
+            TimeZoneInfo timeZoneInfo;
+
+            if (string.IsNullOrWhiteSpace(TimeZone))
+            {
+                timeZoneInfo = TimeZoneInfo.Local;
+            }
+            else
+            {
+                timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+
+                if (timeZoneInfo == null)
+                {
+                    timeZoneInfo = TimeZoneInfo.Local;
+                }
+            }
+
+            return timeZoneInfo;
+        }
+
+        private DateTimeOffset ConvertDate(DateTimeOffset inputTime)
+        {
+            return TimeZoneInfo.ConvertTime(inputTime, GetTimeZoneInfo());
+        }
+
+        private DateTimeOffset GetDateOffSet(DateTimeOffset date)
+        {
+            return GetDateOffSet(date.Year, date.Month, date.Day);
+        }
+        
+        private DateTimeOffset GetDateOffSet(int Year, int Month, int Day)
+        {
+            // get the offset, using the date to ensure daylight savings is accommodated.
+            var newDate = new DateTimeOffset(Year, Month, Day, 0, 0,
+                0, TimeSpan.Zero);
+
+            var offSet = GetTimeZoneInfo().GetUtcOffset(newDate);
+
+            return new DateTimeOffset(Year, Month, Day, 0, 0,
+                0, offSet);
+        }
         
         /// <summary>
         /// Gets a description of the trigger.
@@ -204,9 +274,9 @@ namespace Dexih.Utils.ManagedTasks
         /// Retrieves the next time this schedule will occur from the specified date.
         /// </summary>
         /// <returns>DateTime of schedule, or null if no date is available</returns>
-        public DateTime? NextOccurrence(DateTimeOffset fromDate)
+        public DateTimeOffset? NextOccurrence(DateTime fromDate)
         {
-            DateTime? nextDate = IntervalType switch
+            DateTimeOffset? nextDate = IntervalType switch
             {
                 EIntervalType.None => null,
                 EIntervalType.Daily => NextOccurrenceDaily(fromDate),
@@ -219,48 +289,53 @@ namespace Dexih.Utils.ManagedTasks
             return nextDate > EndDate ? null : nextDate;
         }
 
-        private DateTime? NextOccurrenceOnce(DateTimeOffset fromDate)
+        private DateTimeOffset? NextOccurrenceOnce(DateTime fromDate)
         {
+            var offSetFromDate = ConvertDate(fromDate);
+            
             // for once of, return the start date if it in the future
             if (StartDate == null)
             {
                 return null;
             }
+            
             var startDateTime = StartDate.Value.Date;
             if (StartTime != null)
             {
                 startDateTime = startDateTime.Add(StartTime.Value);
             }
-            if (startDateTime > fromDate)
+            if (startDateTime > offSetFromDate)
             {
                 return startDateTime;
             }
             return null;
         }
 
-        private DateTime? NextOccurrenceMonthly(DateTimeOffset fromDate)
+        private DateTimeOffset? NextOccurrenceMonthly(DateTime fromDate)
         {
+            var offSetFromDate = ConvertDate(fromDate);
+            
             // check if a valid day has already occurred, this means we should jump to next month
-            var priorDate = new DateTime(fromDate.Year, fromDate.Month, 1);
+            var priorDate = GetDateOffSet(offSetFromDate.Year, offSetFromDate.Month, 1);
             if(StartTime != null)
             {
                 priorDate = priorDate.Add(StartTime.Value);
             }
 
             var priorValidDate = false;
-            while (priorDate < fromDate && !priorValidDate)
+            while (priorDate < offSetFromDate && !priorValidDate)
             {
                 priorValidDate = IsValidDate(priorDate);
                 priorDate = priorDate.AddDays(1);
             }
 
-            var nextDate = fromDate;
+            var nextDate = offSetFromDate;
 
             // if there was a valid date earlier in the month, then we should start looking for the next valid date from the 1st of next month.
             if (priorValidDate)
             {
                 nextDate = nextDate.AddMonths(1);
-                nextDate = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, 1), fromDate.Offset);
+                nextDate = GetDateOffSet(nextDate.Year, nextDate.Month, 1);
             }
 
             // if the start time has passed, move to the next day.
@@ -286,19 +361,21 @@ namespace Dexih.Utils.ManagedTasks
 
             if (isValidDate)
             {
-                var startDateTime = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, nextDate.Day), fromDate.Offset);
+                var startDateTime = GetDateOffSet(nextDate);
                 if (StartTime != null)
                 {
                     startDateTime = startDateTime.Add(StartTime.Value);
                 }
-                return startDateTime.DateTime;
+                return startDateTime;
             }
             return null;
         }
 
-        private DateTime? NextOccurrenceDaily(DateTimeOffset fromDate)
+        private DateTimeOffset? NextOccurrenceDaily(DateTime fromDate)
         {
-            var nextDate = fromDate;
+            var offSetFromDate = ConvertDate(fromDate);
+            
+            var nextDate = offSetFromDate;
 
             // if the start time has passed, move to the next day.
             if (StartTime != null && nextDate.TimeOfDay > StartTime)
@@ -322,25 +399,25 @@ namespace Dexih.Utils.ManagedTasks
 
             if (isValidDate)
             {
-                var startDateTime = new DateTimeOffset(new DateTime(nextDate.Year, nextDate.Month, nextDate.Day), fromDate.Offset);
+                var startDateTime = GetDateOffSet(nextDate);
                 if (StartTime != null)
                 {
                     startDateTime = startDateTime.Add(StartTime.Value);
                 }
-                return startDateTime.DateTime;
+                return startDateTime;
             }
             return null;
         }
 
-        private DateTime? NextOccurrenceInterval(DateTimeOffset fromDate)
+        private DateTimeOffset? NextOccurrenceInterval(DateTime fromDate)
         {
-            var offSet = fromDate.Offset;
+            var offSetFromDate = ConvertDate(fromDate);
             
             var dailyStart = StartTime ?? new TimeSpan(0, 0, 0);
             var dailyEnd = EndTime ?? new TimeSpan(23, 59, 59);
             
             //set the initial start date
-            var startAt = StartDate == null || StartDate < fromDate ? fromDate.Date : new DateTimeOffset(StartDate.Value.Date, offSet);
+            var startAt = StartDate == null || StartDate < offSetFromDate ? GetDateOffSet(offSetFromDate) : GetDateOffSet(StartDate.Value.Date);
 
             ValidateTrigger();
 
@@ -374,7 +451,7 @@ namespace Dexih.Utils.ManagedTasks
             var recurs = 1;
 
             //loop through the intervals until we find one that is greater than the current time.
-            while (startAt < fromDate && passDate)
+            while (startAt < offSetFromDate && passDate)
             {
                 if (IntervalTime != null && IntervalTime != TimeSpan.Zero)
                 {
@@ -423,14 +500,14 @@ namespace Dexih.Utils.ManagedTasks
                     startAt = startAt.Date.Add(dailyStart);
                 }
 
-                if ((IntervalTime == null || IntervalTime == TimeSpan.Zero) && startAt < fromDate)
+                if ((IntervalTime == null || IntervalTime == TimeSpan.Zero) && startAt < offSetFromDate)
                 {
                     return null;
                 }
 
             }
             
-            return startAt.DateTime;
+            return startAt;
         }
 
         private void ValidateTrigger()

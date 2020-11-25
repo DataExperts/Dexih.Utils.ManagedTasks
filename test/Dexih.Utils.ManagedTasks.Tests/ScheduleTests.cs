@@ -21,7 +21,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
         /// <param name="expectedTime"></param>
         /// <param name="actualTime"></param>
         /// <param name="millisecondTolerance"></param>
-        private void TimeTest(DateTime expectedTime, DateTime actualTime, int millisecondTolerance = 200)
+        private void TimeTest(DateTimeOffset expectedTime, DateTimeOffset actualTime, int millisecondTolerance = 200)
         {
             var tolerance = new TimeSpan(0, 0, 0, 0, millisecondTolerance);
             var expectedLowTime = expectedTime.Subtract(tolerance);
@@ -42,7 +42,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 StartTime = currentDate.AddMinutes(1).TimeOfDay
             };
 
-            var nextSchedule = (DateTime)schedule.NextOccurrence(currentDate);
+            var nextSchedule = (DateTimeOffset)schedule.NextOccurrence(currentDate);
             _output.WriteLine($"Schedule details {schedule.Details}.");
             _output.WriteLine($"Schedule time {nextSchedule}.");
 
@@ -63,7 +63,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 IntervalType = EIntervalType.Daily
             };
 
-            var nextSchedule = (DateTime)schedule.NextOccurrence(currentDate);
+            var nextSchedule = (DateTimeOffset)schedule.NextOccurrence(currentDate);
             _output.WriteLine($"Schedule details {schedule.Details}.");
             _output.WriteLine($"Schedule time {nextSchedule}.");
 
@@ -244,8 +244,26 @@ namespace Dexih.Utils.Managed.Tasks.Tests
             var scheduled = schedule.NextOccurrence(startDate);
             
             // the expected date will be on the following friday
-            var expected = expectedDate.Date.AddHours(1).ToUniversalTime();
-            Assert.Equal(expected, scheduled.Value.ToUniversalTime());
+            var expected = expectedDate.Date.AddHours(1);
+            Assert.Equal(expected, scheduled.Value.DateTime);
+        }
+        
+        [Fact]
+        public void ScheduleWithTimeZone()
+        {
+            //the schedule once, should be return the same date if in the future.
+            var schedule = new ManagedTaskTrigger()
+            {
+                IntervalType = EIntervalType.Interval,
+                StartTime = new TimeSpan(12, 0, 0),
+                IntervalTime = TimeSpan.FromDays(1),
+                TimeZone = "America/Los_Angeles",
+                MaxRecurs = null
+            };
+
+            var scheduled=  schedule.NextOccurrence(DateTime.Now);
+            Assert.Equal(12, scheduled.Value.Hour);
+
         }
         
 //TODO more schedule tests

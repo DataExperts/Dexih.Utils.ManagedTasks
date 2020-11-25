@@ -20,7 +20,7 @@ namespace Dexih.Utils.ManagedTasks
         {
         }
 
-        public virtual void Schedule(DateTime startsAt, CancellationToken cancellationToken = default)
+        public virtual void Schedule(DateTimeOffset startsAt, CancellationToken cancellationToken = default)
         {
         }
 

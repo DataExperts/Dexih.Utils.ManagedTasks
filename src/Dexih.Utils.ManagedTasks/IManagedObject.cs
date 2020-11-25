@@ -21,7 +21,7 @@ namespace Dexih.Utils.ManagedTasks
         /// Action to take when task is scheduled.
         /// </summary>
         /// <returns></returns>
-        void Schedule(DateTime startsAt, CancellationToken cancellationToken = default);
+        void Schedule(DateTimeOffset startsAt, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Data object which can be used to expose any data the task needs to provide to other processes.

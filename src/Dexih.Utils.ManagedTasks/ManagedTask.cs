@@ -144,7 +144,7 @@ namespace Dexih.Utils.ManagedTasks
         public IEnumerable<ManagedTaskFileWatcher> FileWatchers { get; set; }
 
         [DataMember(Order = 21)]
-        public DateTime? NextTriggerTime { get; set; }
+        public DateTimeOffset? NextTriggerTime { get; set; }
 
         [DataMember(Order = 22)]
         public int RunCount { get; private set; }
@@ -311,7 +311,7 @@ namespace Dexih.Utils.ManagedTasks
             if (Triggers != null)
             {
                 // loop through the triggers to find the one scheduled the soonest.
-                DateTime? startAt = null;
+                DateTimeOffset? startAt = null;
                 foreach (var trigger in Triggers)
                 {
                     var triggerTime = trigger.NextOccurrence(DateTime.Now);
