@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection.Metadata;
 using Dexih.Utils.ManagedTasks;
 using Xunit;
@@ -257,7 +258,7 @@ namespace Dexih.Utils.Managed.Tasks.Tests
                 IntervalType = EIntervalType.Interval,
                 StartTime = new TimeSpan(12, 0, 0),
                 IntervalTime = TimeSpan.FromDays(1),
-                TimeZone = "America/Los_Angeles",
+                TimeZone = TimeZoneInfo.GetSystemTimeZones().First().Id,
                 MaxRecurs = null
             };
 
